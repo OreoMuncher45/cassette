@@ -3,7 +3,6 @@ package utils
 import (
 	"os"
 	"path/filepath"
-	"strings"
 	"testing"
 )
 
@@ -25,14 +24,9 @@ func TestAppConfigSpotifyClientIDTrimsWhitespace(t *testing.T) {
 	}
 }
 
-func TestValidateStartupConfigRequiresSpotifyClientID(t *testing.T) {
-	err := validateStartupConfig(AppConfig{})
-	if err == nil {
-		t.Fatal("validateStartupConfig() returned nil, want error")
-	}
-	want := "missing required config value `auth.client_id`"
-	if got := err.Error(); !strings.HasPrefix(got, want) {
-		t.Fatalf("validateStartupConfig() error = %q, want prefix %q", got, want)
+func TestValidateStartupConfigDoesNotRequireSpotifyClientID(t *testing.T) {
+	if err := validateStartupConfig(AppConfig{}); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -45,17 +39,11 @@ func TestValidateStartupConfigAcceptsConfiguredSpotifyClientID(t *testing.T) {
 	}
 }
 
-func TestValidateStartupConfigRejectsPlaceholderSpotifyClientID(t *testing.T) {
+func TestValidateStartupConfigAcceptsLegacyClientID(t *testing.T) {
 	cfg := AppConfig{}
 	cfg.Auth.ClientID = spotifyClientIDPlaceholder
-
-	err := validateStartupConfig(cfg)
-	if err == nil {
-		t.Fatal("validateStartupConfig() returned nil, want error")
-	}
-	want := "missing required config value `auth.client_id`"
-	if got := err.Error(); !strings.HasPrefix(got, want) {
-		t.Fatalf("validateStartupConfig() error = %q, want prefix %q", got, want)
+	if err := validateStartupConfig(cfg); err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -96,8 +84,8 @@ func TestLoadConfigCreatesConfigYMLWhenMissing(t *testing.T) {
 	if string(got) != defaultAppConfigFileContent {
 		t.Fatalf("config file contents = %q, want %q", string(got), defaultAppConfigFileContent)
 	}
-	if cfg.Auth.ClientID != spotifyClientIDPlaceholder {
-		t.Fatalf("LoadConfig().Auth.ClientID = %q, want %q", cfg.Auth.ClientID, spotifyClientIDPlaceholder)
+	if cfg.Auth.ClientID != "" {
+		t.Fatalf("LoadConfig().Auth.ClientID = %q, want %q", cfg.Auth.ClientID, "")
 	}
 }
 

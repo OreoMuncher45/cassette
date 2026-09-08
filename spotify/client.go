@@ -1,208 +1,126 @@
+// Package spotify adapts the daemon's browsing API to the UI's data types.
 package spotify
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"net/http"
+	"github.com/dubeyKartikay/lazyspotify/librespot"
+	spotifyapi "github.com/zmb3/spotify/v2"
+	"net/url"
+	"strconv"
 	"strings"
-
-	"github.com/dubeyKartikay/lazyspotify/core/auth"
-	"github.com/dubeyKartikay/lazyspotify/core/logger"
-	"github.com/zalando/go-keyring"
-	"github.com/zmb3/spotify/v2"
-	"golang.org/x/oauth2"
 )
 
-type SpotifyClient struct {
-	client *spotify.Client
-}
+type SpotifyClient struct{ client *librespot.LibrespotApiClient }
 
-func NewSpotifyClient(ctx context.Context, auth *auth.Authenticator) (*SpotifyClient, error) {
-	client, err := auth.GetClient(ctx)
-	if err != nil {
-		logger.Log.Error().Err(err).Msg("error getting spotify client")
+func NewSpotifyClient(client *librespot.LibrespotApiClient) *SpotifyClient {
+	return &SpotifyClient{client: client}
+}
+func browsePage[T any](ctx context.Context, s *SpotifyClient, kind string, query url.Values) (*T, error) {
+	var page T
+	if err := s.client.Browse(ctx, kind, query, &page); err != nil {
 		return nil, err
 	}
-	return &SpotifyClient{client: client}, nil
+	return &page, nil
 }
-
+func pageQuery(offset, limit int) url.Values {
+	return url.Values{"offset": {strconv.Itoa(offset)}, "limit": {strconv.Itoa(limit)}}
+}
 func (s *SpotifyClient) GetUserID(ctx context.Context) (string, error) {
-	user, err := s.client.CurrentUser(ctx)
+	user, err := browsePage[struct {
+		ID string `json:"id"`
+	}](ctx, s, "user", nil)
 	if err != nil {
-		logger.Log.Error().Err(err).Msg("error getting user id")
 		return "", err
 	}
 	return user.ID, nil
 }
-
 func (s *SpotifyClient) GetFirstSavedTrack(ctx context.Context) (string, error) {
-	tracks, err := s.GetSavedTracks(ctx, 0)
-	if err != nil || tracks == nil || len(tracks.Tracks) == 0 {
-		logger.Log.Error().Stack().Err(err).Msg("error getting daily mix")
-		if err == nil {
-			err = fmt.Errorf("no saved tracks found")
-		}
+	track, err := browsePage[struct {
+		URI string `json:"uri"`
+	}](ctx, s, "first-track", nil)
+	if err != nil {
 		return "", err
 	}
-	logger.Log.Info().Any("playlists", tracks)
-	return string(tracks.Tracks[0].URI), nil
+	return track.URI, nil
 }
-
-func (s *SpotifyClient) GetUserPlaylists(ctx context.Context, offset int) (*spotify.SimplePlaylistPage, error) {
-	list, err := s.client.CurrentUsersPlaylists(ctx, spotify.Offset(offset), spotify.Limit(10))
-	if err != nil {
-		logger.Log.Error().Err(err).Msg("error getting user playlists")
-		return nil, err
+func (s *SpotifyClient) GetFollowedArtists(ctx context.Context, after string) (*spotifyapi.FullArtistCursorPage, error) {
+	// Pathfinder library pages use an offset cursor instead of an artist ID.
+	if after == "" {
+		after = "0"
 	}
-	return list, nil
+	return browsePage[spotifyapi.FullArtistCursorPage](ctx, s, "artists", url.Values{"offset": {after}, "limit": {"10"}})
 }
-
-func (s *SpotifyClient) GetSavedTracks(ctx context.Context, offset int) (*spotify.SavedTrackPage, error) {
-	tracks, err := s.client.CurrentUsersTracks(ctx, spotify.Offset(offset), spotify.Limit(10))
-	if err != nil {
-		logger.Log.Error().Err(err).Msg("error getting saved tracks")
+func (s *SpotifyClient) GetPlaylistTracks(ctx context.Context, uri string, offset int) ([]spotifyapi.FullTrack, error) {
+	if _, err := idFromURI(uri); err != nil {
 		return nil, err
 	}
-	return tracks, nil
-}
-
-func (s *SpotifyClient) GetSavedAlbums(ctx context.Context, offset int) (*spotify.SavedAlbumPage, error) {
-	albums, err := s.client.CurrentUsersAlbums(ctx, spotify.Offset(offset), spotify.Limit(10))
-	if err != nil {
-		logger.Log.Error().Err(err).Msg("error getting saved albums")
-		return nil, err
-	}
-	return albums, nil
-}
-
-func (s *SpotifyClient) GetFollowedArtists(ctx context.Context, after string) (*spotify.FullArtistCursorPage, error) {
-	opts := []spotify.RequestOption{spotify.Limit(10)}
-	if after != "" {
-		opts = append(opts, spotify.After(after))
-	}
-	artists, err := s.client.CurrentUsersFollowedArtists(ctx, opts...)
-	if err != nil {
-		logger.Log.Error().Err(err).Msg("error getting followed artists")
-		return nil, err
-	}
-	return artists, nil
-}
-
-func (s *SpotifyClient) GetPlaylistTracks(ctx context.Context, uri string, offset int) ([]spotify.FullTrack, error) {
-	id, err := idFromURI(uri)
+	page, err := s.client.ResolvePlaylistTracks(ctx, uri, offset, 10)
 	if err != nil {
 		return nil, err
 	}
-	page, err := s.client.GetPlaylistItems(ctx, spotify.ID(id), spotify.Offset(offset), spotify.Limit(10))
-	if err != nil {
-		logger.Log.Error().Err(err).Str("uri", uri).Int("offset", offset).Msg("error getting playlist tracks")
-		return nil, err
-	}
-	tracks := make([]spotify.FullTrack, 0, len(page.Items))
-	for _, item := range page.Items {
-		if item.Track.Track == nil {
-			continue
+	tracks := make([]spotifyapi.FullTrack, 0, len(page.Tracks))
+	for _, item := range page.Tracks {
+		var track spotifyapi.FullTrack
+		track.URI, track.Name, track.Duration = spotifyapi.URI(item.URI), item.Name, spotifyapi.Numeric(item.DurationMs)
+		for _, name := range item.Artists {
+			track.Artists = append(track.Artists, spotifyapi.SimpleArtist{Name: name})
 		}
-		tracks = append(tracks, *item.Track.Track)
+		track.Album.Name, track.Album.URI = item.AlbumName, spotifyapi.URI(item.AlbumURI)
+		track.Album.Images = []spotifyapi.Image{{URL: item.Img}}
+		tracks = append(tracks, track)
 	}
 	return tracks, nil
 }
-
-func (s *SpotifyClient) GetArtistAlbums(ctx context.Context, uri string, offset int) (*spotify.SimpleAlbumPage, error) {
-	id, err := idFromURI(uri)
-	if err != nil {
-		return nil, err
-	}
-	page, err := s.client.GetArtistAlbums(ctx, spotify.ID(id), nil, spotify.Offset(offset), spotify.Limit(10))
-	if err != nil {
-		logger.Log.Error().Err(err).Str("uri", uri).Int("offset", offset).Msg("error getting artist albums")
-		return nil, err
-	}
-	return page, nil
-}
-
-func (s *SpotifyClient) GetAlbumTracks(ctx context.Context, uri string, offset int) (*spotify.SimpleTrackPage, error) {
-	id, err := idFromURI(uri)
-	if err != nil {
-		return nil, err
-	}
-	page, err := s.client.GetAlbumTracks(ctx, spotify.ID(id), spotify.Offset(offset), spotify.Limit(50))
-	if err != nil {
-		logger.Log.Error().Err(err).Str("uri", uri).Int("offset", offset).Msg("error getting album tracks")
-		return nil, err
-	}
-	return page, nil
-}
-
-func (s *SpotifyClient) SearchPlaylists(ctx context.Context, query string, offset int, limit int) (*spotify.SimplePlaylistPage, error) {
-	result, err := s.client.Search(ctx, query, spotify.SearchTypePlaylist, spotify.Offset(offset), spotify.Limit(limit))
-	if err != nil {
-		logger.Log.Error().Err(err).Str("query", query).Int("offset", offset).Msg("error searching playlists")
-		return nil, err
-	}
-	if result.Playlists == nil {
-		return &spotify.SimplePlaylistPage{}, nil
-	}
-	return result.Playlists, nil
-}
-
-func (s *SpotifyClient) SearchTracks(ctx context.Context, query string, offset int, limit int) (*spotify.FullTrackPage, error) {
-	result, err := s.client.Search(ctx, query, spotify.SearchTypeTrack, spotify.Offset(offset), spotify.Limit(limit))
-	if err != nil {
-		logger.Log.Error().Err(err).Str("query", query).Int("offset", offset).Msg("error searching tracks")
-		return nil, err
-	}
-	if result.Tracks == nil {
-		return &spotify.FullTrackPage{}, nil
-	}
-	return result.Tracks, nil
-}
-
-func (s *SpotifyClient) SearchAlbums(ctx context.Context, query string, offset int, limit int) (*spotify.SimpleAlbumPage, error) {
-	result, err := s.client.Search(ctx, query, spotify.SearchTypeAlbum, spotify.Offset(offset), spotify.Limit(limit))
-	if err != nil {
-		logger.Log.Error().Err(err).Str("query", query).Int("offset", offset).Msg("error searching albums")
-		return nil, err
-	}
-	if result.Albums == nil {
-		return &spotify.SimpleAlbumPage{}, nil
-	}
-	return result.Albums, nil
-}
-
-func (s *SpotifyClient) SearchArtists(ctx context.Context, query string, offset int, limit int) (*spotify.FullArtistPage, error) {
-	result, err := s.client.Search(ctx, query, spotify.SearchTypeArtist, spotify.Offset(offset), spotify.Limit(limit))
-	if err != nil {
-		logger.Log.Error().Err(err).Str("query", query).Int("offset", offset).Msg("error searching artists")
-		return nil, err
-	}
-	if result.Artists == nil {
-		return &spotify.FullArtistPage{}, nil
-	}
-	return result.Artists, nil
-}
-
 func idFromURI(uri string) (string, error) {
 	parts := strings.Split(uri, ":")
-	if len(parts) < 3 {
+	if len(parts) < 3 || parts[0] != "spotify" || parts[len(parts)-1] == "" {
 		return "", fmt.Errorf("invalid spotify uri: %s", uri)
 	}
-	id := parts[len(parts)-1]
-	if id == "" {
-		return "", fmt.Errorf("invalid spotify uri: %s", uri)
-	}
-	return id, nil
+	return parts[len(parts)-1], nil
 }
+func (s *SpotifyClient) GetUserPlaylists(ctx context.Context, offset int) (*spotifyapi.SimplePlaylistPage, error) {
+	q := pageQuery(offset, 10)
 
-func IsAuthError(err error) bool {
-	var spotifyErr spotify.Error
-	if errors.Is(err, keyring.ErrNotFound) {
-		return true
-	}
-	if errors.As(err, &spotifyErr) && spotifyErr.Status == http.StatusUnauthorized {
-		return true
-	}
-	var retrieveErr *oauth2.RetrieveError
-	return errors.As(err, &retrieveErr) && retrieveErr.ErrorCode == "invalid_grant"
+	return browsePage[spotifyapi.SimplePlaylistPage](ctx, s, "playlists", q)
+}
+func (s *SpotifyClient) GetSavedTracks(ctx context.Context, offset int) (*spotifyapi.SavedTrackPage, error) {
+	q := pageQuery(offset, 10)
+
+	return browsePage[spotifyapi.SavedTrackPage](ctx, s, "tracks", q)
+}
+func (s *SpotifyClient) GetSavedAlbums(ctx context.Context, offset int) (*spotifyapi.SavedAlbumPage, error) {
+	q := pageQuery(offset, 10)
+
+	return browsePage[spotifyapi.SavedAlbumPage](ctx, s, "albums", q)
+}
+func (s *SpotifyClient) GetArtistAlbums(ctx context.Context, uri string, offset int) (*spotifyapi.SimpleAlbumPage, error) {
+	q := pageQuery(offset, 10)
+	q.Set("uri", uri)
+	return browsePage[spotifyapi.SimpleAlbumPage](ctx, s, "artist-albums", q)
+}
+func (s *SpotifyClient) GetAlbumTracks(ctx context.Context, uri string, offset int) (*spotifyapi.SimpleTrackPage, error) {
+	q := pageQuery(offset, 50)
+	q.Set("uri", uri)
+	return browsePage[spotifyapi.SimpleTrackPage](ctx, s, "album-tracks", q)
+}
+func (s *SpotifyClient) SearchPlaylists(ctx context.Context, query string, offset, limit int) (*spotifyapi.SimplePlaylistPage, error) {
+	q := pageQuery(offset, limit)
+	q.Set("q", query)
+	return browsePage[spotifyapi.SimplePlaylistPage](ctx, s, "search-playlists", q)
+}
+func (s *SpotifyClient) SearchTracks(ctx context.Context, query string, offset, limit int) (*spotifyapi.FullTrackPage, error) {
+	q := pageQuery(offset, limit)
+	q.Set("q", query)
+	return browsePage[spotifyapi.FullTrackPage](ctx, s, "search-tracks", q)
+}
+func (s *SpotifyClient) SearchAlbums(ctx context.Context, query string, offset, limit int) (*spotifyapi.SimpleAlbumPage, error) {
+	q := pageQuery(offset, limit)
+	q.Set("q", query)
+	return browsePage[spotifyapi.SimpleAlbumPage](ctx, s, "search-albums", q)
+}
+func (s *SpotifyClient) SearchArtists(ctx context.Context, query string, offset, limit int) (*spotifyapi.FullArtistPage, error) {
+	q := pageQuery(offset, limit)
+	q.Set("q", query)
+	return browsePage[spotifyapi.FullArtistPage](ctx, s, "search-artists", q)
 }

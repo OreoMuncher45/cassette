@@ -17,14 +17,25 @@ type Player struct {
 	shuffled  bool
 }
 
-func NewPlayer(ctx context.Context, userId string, accessToken string) (*Player, error) {
-	l, err := librespot.InitLibrespot(ctx, userId, accessToken, true)
+func NewPlayer(ctx context.Context) (*Player, error) {
+	l, err := librespot.InitLibrespot(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize librespot: %w", err)
 	}
 	return &Player{
 		librespot: l,
 	}, nil
+}
+
+func (p *Player) APIClient() *librespot.LibrespotApiClient {
+	return p.librespot.Client
+}
+
+func (p *Player) AuthCodes() <-chan *models.DeviceAuth {
+	if p == nil || p.librespot == nil {
+		return nil
+	}
+	return p.librespot.AuthCodes
 }
 
 func (p *Player) requireLibrespot() (*librespot.Librespot, error) {
@@ -208,6 +219,7 @@ func (p *Player) Destroy(ctx context.Context) {
 	if l.Events != nil {
 		l.Events.Close()
 	}
+	l.StopReadiness()
 	l.Daemon.StopDaemon()
 }
 

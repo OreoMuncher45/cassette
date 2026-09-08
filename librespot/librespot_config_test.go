@@ -47,7 +47,7 @@ func TestMakeLibrespotConfigUsesConfiguredDaemonLogLevel(t *testing.T) {
 	cfg.Librespot.Port = 4040
 	cfg.Librespot.Daemon.LogLevel = "WARN"
 
-	got := makeLibrespotConfig(cfg, "user-id", "token")
+	got := makeLibrespotConfig(cfg)
 
 	if got.LogLevel != "warn" {
 		t.Fatalf("makeLibrespotConfig(...).LogLevel = %q, want %q", got.LogLevel, "warn")
@@ -59,7 +59,7 @@ func TestMakeLibrespotConfigDefaultsDaemonLogLevelToError(t *testing.T) {
 	cfg.Librespot.Host = "127.0.0.1"
 	cfg.Librespot.Port = 4040
 
-	got := makeLibrespotConfig(cfg, "user-id", "token")
+	got := makeLibrespotConfig(cfg)
 
 	if got.LogLevel != "error" {
 		t.Fatalf("makeLibrespotConfig(...).LogLevel = %q, want %q", got.LogLevel, "error")
@@ -71,7 +71,7 @@ func TestMakeLibrespotConfigEnablesMprisOnLinux(t *testing.T) {
 	cfg.Librespot.Host = "127.0.0.1"
 	cfg.Librespot.Port = 4040
 
-	got := makeLibrespotConfig(cfg, "user-id", "token")
+	got := makeLibrespotConfig(cfg)
 
 	if runtime.GOOS == "linux" && !got.MprisEnabled {
 		t.Fatal("makeLibrespotConfig(...).MprisEnabled = false, want true on linux")
