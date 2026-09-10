@@ -24,7 +24,7 @@ const (
 	previousPath      = "/player/prev"
 	volumePath        = "/player/volume"
 	resolveTracksPath = "/resolver/tracks"
-	shufflePath       = "/player/shuffle_context"
+	shufflePath      = "/player/shuffle_context"
 )
 
 type LibrespotApiServer struct {
@@ -60,12 +60,8 @@ func NewLibrespotApiClient(server *LibrespotApiServer) *LibrespotApiClient {
 }
 
 func (l *LibrespotApiClient) GetHealth() (*models.HealthResponse, error) {
-	return l.GetHealthContext(context.Background())
-}
-
-func (l *LibrespotApiClient) GetHealthContext(ctx context.Context) (*models.HealthResponse, error) {
 	url := l.server.GetServerUrl() + healthPath
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	req, err := http.NewRequest("GET", url, nil)
 	logger.Log.Debug().Str("url", url).Msg("requesting health")
 	if err != nil {
 		return nil, err
@@ -75,9 +71,6 @@ func (l *LibrespotApiClient) GetHealthContext(ctx context.Context) (*models.Heal
 		return nil, err
 	}
 	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("daemon health returned HTTP %d", resp.StatusCode)
-	}
 	resData, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return nil, err

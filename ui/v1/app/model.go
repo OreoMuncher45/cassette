@@ -15,6 +15,7 @@ import (
 	"github.com/dubeyKartikay/lazyspotify/ui/v1/mediacenter"
 	"github.com/dubeyKartikay/lazyspotify/ui/v1/player"
 
+	"github.com/dubeyKartikay/lazyspotify/core/auth"
 	"github.com/dubeyKartikay/lazyspotify/core/logger"
 	coreplayer "github.com/dubeyKartikay/lazyspotify/core/player"
 	"github.com/dubeyKartikay/lazyspotify/core/ticker"
@@ -33,8 +34,6 @@ type Model struct {
 	fatalErr           error
 	player             *coreplayer.Player
 	spotifyClient      *spotify.SpotifyClient
-	deviceAuth         *models.DeviceAuth
-	deviceAuthHint     string
 	mediaCenter        mediacenter.Model
 	width              int
 	height             int
@@ -177,7 +176,31 @@ func (m *Model) start() error {
 		m.authModel.SetSize(m.width, m.height)
 	}
 
-	m.player, err = coreplayer.NewPlayer(ctx)
+	m.spotifyClient, err = spotify.NewSpotifyClient(ctx, m.authModel.Authenticator())
+	if err != nil {
+		if spotify.IsAuthError(err) {
+			m.authModel.SetState(uiauth.NeedsAuth)
+		}
+		logger.Log.Error().Err(err).Msg("failed to create spotify client")
+		return err
+	}
+
+	userID, err := m.spotifyClient.GetUserID(ctx)
+	logger.Log.Info().Str("user id", userID).Msg("got user id")
+	if err != nil {
+		if spotify.IsAuthError(err) {
+			m.authModel.SetState(uiauth.NeedsAuth)
+		}
+		return err
+	}
+
+	token, err := auth.New().GetAuthToken(ctx)
+	if err != nil || token == nil {
+		m.authModel.SetState(uiauth.NeedsAuth)
+		return err
+	}
+
+	m.player, err = coreplayer.NewPlayer(ctx, userID, token.AccessToken)
 	if err != nil {
 		logger.Log.Error().Err(err).Msg("failed to create player")
 		return err
@@ -187,8 +210,6 @@ func (m *Model) start() error {
 		m.player = nil
 		return fmt.Errorf("failed to start librespot daemon: %w", err)
 	}
-	m.spotifyClient = spotify.NewSpotifyClient(m.player.APIClient())
-	m.mediaCenter.SetDisplay("Waiting for Spotify authorization")
 	return nil
 }
 
@@ -517,9 +538,7 @@ func paginationFromOffset(offset, count, total, pageSize int) common.PaginationI
 	if pageSize > 0 {
 		currentPage = (offset / pageSize) + 1
 	}
-	// Unavailable entities may be filtered from a page by the daemon.
-	// Advance by the requested page span, not the number of visible entities.
-	hasNext := pageSize > 0 && offset+pageSize < total
+	hasNext := offset+count < total
 	nextCursor := ""
 	if hasNext {
 		nextCursor = encodeOffsetCursor(offset + pageSize)
@@ -534,7 +553,7 @@ func paginationFromOffset(offset, count, total, pageSize int) common.PaginationI
 }
 
 func paginationFromCursor(page, count, total, pageSize int, nextCursor string) common.PaginationInfo {
-	hasNext := nextCursor != ""
+	hasNext := nextCursor != "" && count > 0
 	if page <= 0 {
 		page = 1
 	}

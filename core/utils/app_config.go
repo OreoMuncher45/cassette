@@ -14,7 +14,7 @@ const SpotifyClientIDHelpURL = "https://github.com/dubeyKartikay/lazyspotify?tab
 const (
 	appConfigFileName           = "config.yml"
 	spotifyClientIDPlaceholder  = "your_spotify_app_client_id"
-	defaultAppConfigFileContent = "# Sign in using the Spotify device authorization code shown by lazyspotify.\n"
+	defaultAppConfigFileContent = "auth:\n  client_id: your_spotify_app_client_id\n"
 )
 
 var (
@@ -120,6 +120,9 @@ func ValidateStartupConfig() error {
 }
 
 func validateStartupConfig(cfg AppConfig) error {
+	if clientID := cfg.SpotifyClientID(); clientID == "" || clientID == spotifyClientIDPlaceholder {
+		return fmt.Errorf("missing required config value `auth.client_id`; see %s", SpotifyClientIDHelpURL)
+	}
 	return nil
 }
 

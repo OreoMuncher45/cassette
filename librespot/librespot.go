@@ -2,7 +2,6 @@ package librespot
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -13,16 +12,14 @@ import (
 )
 
 type Librespot struct {
-	Daemon          daemon.DaemonManager
-	Server          *LibrespotApiServer
-	Client          *LibrespotApiClient
-	Events          *eventSocket
-	Ready           chan error
-	AuthCodes       chan *models.DeviceAuth
-	cancelReadiness context.CancelFunc
+	Daemon daemon.DaemonManager
+	Server *LibrespotApiServer
+	Client *LibrespotApiClient
+	Events *eventSocket
+	Ready  chan error
 }
 
-func InitLibrespot(ctx context.Context) (*Librespot, error) {
+func InitLibrespot(ctx context.Context, userId string, accessToken string, panicOnDaemonFailure bool) (*Librespot, error) {
 	cfg := utils.GetConfig().Librespot
 	logger.Log.Info().Str("config", fmt.Sprintf("%+v", cfg)).Msg("librespot config")
 	librespotCommand, err := utils.ResolveLibrespotDaemonCmd(cfg.Daemon.Cmd)
@@ -30,7 +27,7 @@ func InitLibrespot(ctx context.Context) (*Librespot, error) {
 		return nil, err
 	}
 	librespotCommand = append(append([]string{}, librespotCommand...), "--config_dir", GetLibrespotConfigDir())
-	err = InitLibrespotConfig(ctx)
+	err = InitLibrespotConfig(ctx, userId, accessToken)
 	if err != nil {
 		return nil, err
 	}
@@ -42,52 +39,22 @@ func InitLibrespot(ctx context.Context) (*Librespot, error) {
 	librespotApiServer := NewLibrespotApiServer(cfg.Host, cfg.Port)
 	librespotApiClient := NewLibrespotApiClient(librespotApiServer)
 	librespotWs := newEventSocket(librespotApiServer.GetServerUrl())
-	readyCtx, cancel := context.WithCancel(ctx)
-	l := &Librespot{Daemon: daemonManager, Server: librespotApiServer, Client: librespotApiClient, Events: librespotWs, Ready: make(chan error, 1), AuthCodes: make(chan *models.DeviceAuth, 1), cancelReadiness: cancel}
-	go notifyWhenReady(readyCtx, l)
+	l := &Librespot{Daemon: daemonManager, Server: librespotApiServer, Client: librespotApiClient, Events: librespotWs, Ready: make(chan error, 1)}
+	go notifyWhenReady(l)
 	return l, nil
 }
 
-func notifyWhenReady(ctx context.Context, l *Librespot) {
-	defer close(l.AuthCodes)
-	deadline := time.Now().Add(3 * time.Minute)
-	var previous *models.DeviceAuth
-	for time.Now().Before(deadline) {
-		pollCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
-		code, authErr := l.Client.GetAuthCode(pollCtx)
-		cancel()
-		if errors.Is(authErr, ErrDeviceAuthUnsupported) {
-			l.Ready <- authErr
+func notifyWhenReady(l *Librespot) {
+	for range 900 {
+		healthRes, err := l.Client.GetHealth()
+
+		if err == nil && healthRes.PlaybackReady {
+			l.Ready <- nil
 			return
 		}
-		if authErr == nil {
-			deadline = readinessDeadline(deadline, code)
-			if (code == nil) != (previous == nil) || (code != nil && previous != nil && *code != *previous) {
-				l.publishAuthCode(code)
-				previous = code
-			}
-		}
-		// /auth/code is served before the session exists. The root health
-		// request may block during device authorization, so do not send it
-		// until approval has cleared the pending code.
-		if code == nil {
-			healthCtx, cancelHealth := context.WithTimeout(ctx, 2*time.Second)
-			health, err := l.Client.GetHealthContext(healthCtx)
-			cancelHealth()
-			if err == nil && health.PlaybackReady {
-				l.publishAuthCode(nil)
-				l.Ready <- nil
-				return
-			}
-		}
-		select {
-		case <-ctx.Done():
-			l.Ready <- ctx.Err()
-			return
-		case <-time.After(time.Second):
-		}
+		time.Sleep(200 * time.Millisecond)
 	}
-	l.Ready <- fmt.Errorf("device authorization or daemon startup timed out; restart to request a new pairing code")
+	l.Ready <- fmt.Errorf("daemon did not become ready before timeout")
 }
 
 func (l *Librespot) EventStream() <-chan models.PlayerEvent {

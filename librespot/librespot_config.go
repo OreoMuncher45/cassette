@@ -18,7 +18,11 @@ type LibrespotConfig struct {
 	AudioBackend    string `yaml:"audio_backend"`
 	DeviceName      string `yaml:"device_name"`
 	Credentials     struct {
-		Type string `yaml:"type"`
+		Type         string `yaml:"type"`
+		SpotifyToken struct {
+			Username    string `yaml:"username"`
+			AccessToken string `yaml:"access_token"`
+		} `yaml:"spotify_token"`
 	} `yaml:"credentials"`
 	Server struct {
 		Enabled     bool   `yaml:"enabled"`
@@ -42,8 +46,8 @@ func GetLibrespotConfigFile() string {
 	return filepath.Join(GetLibrespotConfigDir(), "config.yml")
 }
 
-func InitLibrespotConfig(ctx context.Context) error {
-	librespotConfig := makeLibrespotConfig(utils.GetConfig())
+func InitLibrespotConfig(ctx context.Context, userId string, accessToken string) error {
+	librespotConfig := makeLibrespotConfig(utils.GetConfig(), userId, accessToken)
 	configYaml, err := yaml.Marshal(librespotConfig)
 	if err != nil {
 		return err
@@ -51,7 +55,7 @@ func InitLibrespotConfig(ctx context.Context) error {
 	return os.WriteFile(GetLibrespotConfigFile(), configYaml, 0644)
 }
 
-func makeLibrespotConfig(cfg utils.AppConfig) LibrespotConfig {
+func makeLibrespotConfig(cfg utils.AppConfig, userId string, accessToken string) LibrespotConfig {
 	var librespotConfig = LibrespotConfig{}
 
 	librespotConfig.LogLevel = daemonLogLevel(cfg.Librespot.Daemon.LogLevel)
@@ -59,7 +63,9 @@ func makeLibrespotConfig(cfg utils.AppConfig) LibrespotConfig {
 	librespotConfig.MprisEnabled = mprisEnabledForOS(runtime.GOOS)
 	librespotConfig.AudioBackend = getAudioBackend()
 	librespotConfig.DeviceName = "lazyspotify"
-	librespotConfig.Credentials.Type = "device_auth"
+	librespotConfig.Credentials.Type = "spotify_token"
+	librespotConfig.Credentials.SpotifyToken.Username = userId
+	librespotConfig.Credentials.SpotifyToken.AccessToken = accessToken
 	librespotConfig.Server.Enabled = true
 	librespotConfig.Server.Address = cfg.Librespot.Host
 	librespotConfig.Server.Port = cfg.Librespot.Port
