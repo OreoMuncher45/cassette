@@ -187,12 +187,25 @@ auth:
 
 *(Replace `<YOUR_SPOTIFY_CLIENT_ID>` with your actual client ID)*.
 
-### 3. One-Time Audio Setup (Optional)
-To authorize your terminal as a local audio speaker:
+### 3. Audio & Terminal Setup (Minimal vs Full)
+To authorize your terminal as a local audio speaker and configure terminal album art:
 
 ```bash
 cassette setup
 ```
+
+When you run `cassette setup`, it will prompt you to choose between two profiles:
+
+* **[1] Minimal Setup (Default / Recommended)**
+  - Configures `librespot` for native terminal Spotify Connect playback.
+  - Uses the built-in 24-bit Truecolor ANSI Half-Block Album Art (`▀`) engine.
+  - Zero extra dependencies required — works out of the box in Konsole, Alacritty, Kitty, WezTerm, and any 24-bit color terminal.
+  - Can also be run directly with: `cassette setup --minimal`
+
+* **[2] Full Setup**
+  - Everything in Minimal (terminal audio + built-in album art).
+  - Also installs `chafa` (Char Fast Art) for advanced terminal graphics sub-block dithering and multi-protocol scaling.
+  - Can also be run directly with: `cassette setup --full`
 
 A browser window will pop up asking you to approve Spotify Connect. Once approved, `cassette` will permanently register as your PC's playback device.
 

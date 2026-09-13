@@ -32,11 +32,84 @@ func Run(args []string) {
 }
 
 func setupPCHandler(args []string) {
-	fmt.Println("=== Setting up Cassette local PC audio player (librespot) ===")
+	fmt.Println("╭──────────────────────────────────────────────────────────────────────────╮")
+	fmt.Println("│                        CASSETTE SETUP ASSISTANT                          │")
+	fmt.Println("╰──────────────────────────────────────────────────────────────────────────╯")
+
+	mode := ""
+	for _, a := range args[1:] {
+		if a == "--minimal" || a == "-m" {
+			mode = "minimal"
+		} else if a == "--full" || a == "-f" {
+			mode = "full"
+		}
+	}
+
+	if mode == "" {
+		fmt.Println("\nChoose your setup profile:")
+		fmt.Println("")
+		fmt.Println("  [1] Minimal Setup (Recommended)")
+		fmt.Println("      • Terminal Spotify Connect audio daemon (librespot).")
+		fmt.Println("      • Built-in 24-bit Truecolor ANSI Half-Block Album Art (▀).")
+		fmt.Println("      • Zero extra dependencies needed. Works natively out of the")
+		fmt.Println("        box in Konsole, Alacritty, Kitty, WezTerm, and any terminal.")
+		fmt.Println("")
+		fmt.Println("  [2] Full Setup")
+		fmt.Println("      • Everything in Minimal (librespot + built-in ANSI art).")
+		fmt.Println("      • Installs 'chafa' (Char Fast Art) for advanced terminal")
+		fmt.Println("        sub-block dithering & multi-protocol scaling.")
+		fmt.Println("")
+		fmt.Print("Enter choice [1: Minimal / 2: Full] (default: 1): ")
+
+		reader := bufio.NewReader(os.Stdin)
+		input, _ := reader.ReadString('\n')
+		input = strings.TrimSpace(input)
+		if input == "2" || strings.EqualFold(input, "full") {
+			mode = "full"
+		} else {
+			mode = "minimal"
+		}
+	}
+
+	fmt.Printf("\n--> Selected Profile: %s\n\n", strings.ToUpper(mode))
+
+	if mode == "full" {
+		fmt.Println("Checking for 'chafa'...")
+		if _, err := exec.LookPath("chafa"); err != nil {
+			fmt.Println("'chafa' not found. Attempting installation...")
+			if _, err := exec.LookPath("pacman"); err == nil {
+				c := exec.Command("sudo", "pacman", "-S", "--noconfirm", "chafa")
+				c.Stdout = os.Stdout
+				c.Stderr = os.Stderr
+				_ = c.Run()
+			} else if _, err := exec.LookPath("paru"); err == nil {
+				c := exec.Command("paru", "-S", "--noconfirm", "chafa")
+				c.Stdout = os.Stdout
+				c.Stderr = os.Stderr
+				_ = c.Run()
+			} else if _, err := exec.LookPath("yay"); err == nil {
+				c := exec.Command("yay", "-S", "--noconfirm", "chafa")
+				c.Stdout = os.Stdout
+				c.Stderr = os.Stderr
+				_ = c.Run()
+			} else if _, err := exec.LookPath("apt"); err == nil {
+				c := exec.Command("sudo", "apt", "install", "-y", "chafa")
+				c.Stdout = os.Stdout
+				c.Stderr = os.Stderr
+				_ = c.Run()
+			}
+		}
+		if p, err := exec.LookPath("chafa"); err == nil {
+			fmt.Printf("✓ chafa is installed at: %s\n", p)
+		} else {
+			fmt.Println("Notice: chafa could not be auto-installed. Falling back to built-in ANSI album art.")
+		}
+	}
+
+	fmt.Println("Checking for 'librespot' (Spotify Connect audio daemon)...")
 	binPath, err := player.FindLibrespot()
 	if err != nil {
-		fmt.Println("Error: librespot binary not found.")
-		fmt.Println("Attempting auto-install...")
+		fmt.Println("librespot binary not found. Attempting auto-install...")
 		if _, err := exec.LookPath("pacman"); err == nil {
 			fmt.Println("Running: sudo pacman -S --noconfirm librespot")
 			c := exec.Command("sudo", "pacman", "-S", "--noconfirm", "librespot")
@@ -48,6 +121,11 @@ func setupPCHandler(args []string) {
 			c.Stdout = os.Stdout
 			c.Stderr = os.Stderr
 			_ = c.Run()
+		} else if _, err := exec.LookPath("yay"); err == nil {
+			c := exec.Command("yay", "-S", "--noconfirm", "librespot")
+			c.Stdout = os.Stdout
+			c.Stderr = os.Stderr
+			_ = c.Run()
 		}
 		binPath, err = player.FindLibrespot()
 		if err != nil {
@@ -56,7 +134,7 @@ func setupPCHandler(args []string) {
 		}
 	}
 
-	fmt.Printf("Found librespot at: %s\n", binPath)
+	fmt.Printf("✓ Found librespot at: %s\n", binPath)
 	cacheDir := filepath.Join(utils.SafeGetConfigDir(), "cache")
 	_ = os.MkdirAll(cacheDir, 0755)
 	_ = os.Remove(filepath.Join(cacheDir, "credentials.json")) // clear stale creds

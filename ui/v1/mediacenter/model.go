@@ -7,6 +7,7 @@ import (
 	"cassette/ui/v1/displayscreen"
 	"cassette/ui/v1/lyrics"
 	"cassette/ui/v1/mediapanel"
+	"cassette/ui/v1/nowplaying"
 	"cassette/ui/v1/player"
 	"cassette/ui/v1/queue"
 	spotapi "github.com/zmb3/spotify/v2"
@@ -26,6 +27,7 @@ type Model struct {
 	displayScreen displayscreen.Model
 	lyricsModel   lyrics.Model
 	queueModel    queue.Model
+	nowPlaying    nowplaying.Model
 	leftPanel     LeftPanelMode
 	queueOpen     bool
 	zenMode       bool
@@ -39,6 +41,7 @@ func NewModel(keys common.AppKeyMap) Model {
 		displayScreen: displayscreen.NewModel(),
 		lyricsModel:   lyrics.NewModel(),
 		queueModel:    queue.NewModel(),
+		nowPlaying:    nowplaying.NewModel(),
 		leftPanel:     LeftPanelLyrics, // Lyrics on the left by default
 		queueOpen:     true,            // Queue on the right by default
 		keys:          keys,
@@ -175,4 +178,20 @@ func (m *Model) IsZenMode() bool {
 
 func (m *Model) SearchFocused() bool {
 	return m.mediaPanel.SearchFocused()
+}
+
+func (m *Model) SetArtwork(ansi string) {
+	m.nowPlaying.SetArtwork(ansi)
+}
+
+func (m *Model) SetNowPlayingSong(song common.SongInfo) {
+	m.nowPlaying.SetSong(song)
+}
+
+func (m *Model) SetNowPlayingStatus(playing bool, device string, shuffled bool) {
+	m.nowPlaying.SetStatus(playing, device, shuffled)
+}
+
+func (m *Model) SetNowPlayingVolume(v common.VolumeInfo) {
+	m.nowPlaying.SetVolume(v)
 }

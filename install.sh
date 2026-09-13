@@ -28,6 +28,14 @@ chmod +x "$HOME/.local/bin/cassette"
 
 echo "Installed binary to: $HOME/.local/bin/cassette"
 
+# Check profile
+PROFILE="minimal"
+for arg in "$@"; do
+    if [ "$arg" == "--full" ] || [ "$arg" == "-f" ]; then
+        PROFILE="full"
+    fi
+done
+
 # Check dependencies
 if ! command -v librespot >/dev/null 2>&1 && [ ! -x "/usr/bin/librespot" ]; then
     echo "librespot not found. Attempting to install..."
@@ -37,6 +45,22 @@ if ! command -v librespot >/dev/null 2>&1 && [ ! -x "/usr/bin/librespot" ]; then
         paru -S --noconfirm librespot || true
     elif command -v yay >/dev/null 2>&1; then
         yay -S --noconfirm librespot || true
+    fi
+fi
+
+if [ "$PROFILE" == "full" ]; then
+    echo "Full profile selected: checking for chafa..."
+    if ! command -v chafa >/dev/null 2>&1; then
+        if command -v pacman >/dev/null 2>&1; then
+            sudo pacman -S --noconfirm chafa || true
+        elif command -v paru >/dev/null 2>&1; then
+            paru -S --noconfirm chafa || true
+        elif command -v yay >/dev/null 2>&1; then
+            yay -S --noconfirm chafa || true
+        fi
+    fi
+    if command -v chafa >/dev/null 2>&1; then
+        echo "✓ chafa is installed ($(which chafa))"
     fi
 fi
 

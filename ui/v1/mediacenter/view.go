@@ -14,7 +14,8 @@ func (m *Model) View(maxW, maxH int) string {
 		return lipgloss.NewStyle().BorderStyle(lipgloss.HiddenBorder()).Render(m.mediaPanel.View())
 	}
 
-	sideW := 30
+	lyricsW := 30
+	queueW := 30
 	showLeft := m.leftPanel != LeftPanelClosed
 	showRight := m.queueOpen
 
@@ -23,20 +24,27 @@ func (m *Model) View(maxW, maxH int) string {
 		if maxW < playerW {
 			showLeft = false
 			showRight = false
-		} else if maxW < playerW+sideW {
+		} else if maxW < playerW+30 {
 			showLeft = false
 			showRight = false
-		} else if maxW < playerW+2*sideW {
+		} else if maxW < playerW+60 {
 			if showLeft && showRight {
 				showRight = false
 			}
-		} else if maxW >= playerW+68 {
-			calcSide := (maxW - playerW) / 2
-			if calcSide > 36 {
-				calcSide = 36
+			if showLeft {
+				lyricsW = max(30, min(58, maxW-playerW-2))
+			} else if showRight {
+				queueW = max(30, min(40, maxW-playerW-2))
 			}
-			if calcSide > sideW {
-				sideW = calcSide
+		} else {
+			avail := maxW - playerW
+			queueW = min(36, max(30, avail/3))
+			calcLyrics := avail - queueW - 2
+			if calcLyrics > 58 {
+				calcLyrics = 58
+			}
+			if calcLyrics > lyricsW {
+				lyricsW = calcLyrics
 			}
 		}
 	}
@@ -44,17 +52,17 @@ func (m *Model) View(maxW, maxH int) string {
 	var leftView string
 	if showLeft {
 		if m.leftPanel == LeftPanelLyrics {
-			m.lyricsModel.SetSize(sideW, playerH)
+			m.lyricsModel.SetSize(lyricsW, playerH)
 			leftView = m.lyricsModel.View()
 		} else if m.leftPanel == LeftPanelLibrary {
-			m.mediaPanel.SetSize(sideW, playerH)
+			m.mediaPanel.SetSize(lyricsW, playerH)
 			leftView = m.mediaPanel.View()
 		}
 	}
 
 	var rightView string
 	if showRight {
-		m.queueModel.SetSize(sideW, playerH)
+		m.queueModel.SetSize(queueW, playerH)
 		rightView = m.queueModel.View()
 	}
 
@@ -73,6 +81,15 @@ func (m *Model) View(maxW, maxH int) string {
 	if !m.zenMode {
 		m.displayScreen.SetSize(totalW, 3)
 		content = lipgloss.JoinVertical(lipgloss.Left, m.displayScreen.View(), content)
+
+		// Render Now Playing bottom bar with album art if vertical space permits
+		if maxH == 0 || maxH >= 34 {
+			m.nowPlaying.SetSize(totalW, 11)
+			npView := m.nowPlaying.View()
+			if npView != "" {
+				content = lipgloss.JoinVertical(lipgloss.Left, content, npView)
+			}
+		}
 	}
 
 	v := lipgloss.NewStyle().BorderStyle(lipgloss.HiddenBorder()).Render(content)

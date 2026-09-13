@@ -204,6 +204,14 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 					m.mediaCenter.SetLyricsTrack(track, artist)
 					extraCmds = append(extraCmds, m.fetchLyricsCmd(track, artist), m.fetchQueueCmd())
 				}
+
+				if len(msg.state.Item.Album.Images) > 0 {
+					artURL := msg.state.Item.Album.Images[0].URL
+					if artURL != m.lastArtworkURL {
+						m.lastArtworkURL = artURL
+						extraCmds = append(extraCmds, m.fetchArtworkCmd(artURL, 20, 8))
+					}
+				}
 			}
 			if msg.state.Device.Volume > 0 {
 				m.volumeInfo.Volume = int(msg.state.Device.Volume)
@@ -231,6 +239,11 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 	case queueLoadedMsg:
 		if msg.err == nil && msg.queue != nil {
 			m.mediaCenter.SetQueue(msg.queue)
+		}
+		return nil, true
+	case artworkLoadedMsg:
+		if msg.err == nil && msg.imageURL == m.lastArtworkURL {
+			m.mediaCenter.SetArtwork(msg.ansi)
 		}
 		return nil, true
 	case mediaLoadedMsg:

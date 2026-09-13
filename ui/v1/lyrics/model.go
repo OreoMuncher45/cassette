@@ -67,8 +67,8 @@ func (m *Model) ScrollDown() {
 
 func (m *Model) View() string {
 	w := m.width
-	if w < 20 {
-		w = 20
+	if w < 24 {
+		w = 24
 	}
 	h := m.height
 	if h < 10 {
@@ -78,7 +78,8 @@ func (m *Model) View() string {
 	cGray := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
 	cCyan := lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
 	cActive := lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
-	cDim := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+	cFuture := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
+	cPast := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
 	cNone := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 
 	// Header: ╭── LYRICS ────────────────────╮
@@ -92,71 +93,125 @@ func (m *Model) View() string {
 
 	innerW := w - 4
 	innerH := h - 2
+	maxTextW := innerW - 3
+	if maxTextW < 10 {
+		maxTextW = 10
+	}
 
-	var contentLines []string
+	type displayRow struct {
+		prefix string
+		text   string
+		style  lipgloss.Style
+	}
+
+	var allRows []displayRow
+	activeRowIdx := 0
 
 	if m.loading {
-		contentLines = append(contentLines, cNone.Render("Searching lyrics..."))
+		allRows = append(allRows, displayRow{prefix: "", text: "Searching lyrics...", style: cNone})
 	} else if m.lyrics == nil || (len(m.lyrics.SyncedLyrics) == 0 && len(m.lyrics.PlainLyrics) == 0) {
-		contentLines = append(contentLines, cNone.Render("No lyrics available"))
+		allRows = append(allRows, displayRow{prefix: "", text: "No lyrics available", style: cNone})
 		if m.trackName != "" {
-			contentLines = append(contentLines, cNone.Render(truncate(m.trackName, innerW)))
+			for _, chunk := range wrapWords(m.trackName, innerW) {
+				allRows = append(allRows, displayRow{prefix: "", text: chunk, style: cNone})
+			}
 		}
 	} else if m.lyrics.HasSynced {
 		synced := m.lyrics.SyncedLyrics
 		// Find active line
-		activeIdx := 0
+		activeLineIdx := 0
 		for i, line := range synced {
 			if line.TimeMs <= m.positionMs {
-				activeIdx = i
+				activeLineIdx = i
 			} else {
 				break
 			}
 		}
 
-		centerRow := innerH / 2
-		start := activeIdx - centerRow + m.scrollOff
-		if start < 0 {
-			start = 0
-		}
-
-		for r := 0; r < innerH; r++ {
-			idx := start + r
-			if idx >= len(synced) {
-				contentLines = append(contentLines, "")
+		for i, line := range synced {
+			trimmed := strings.TrimSpace(line.Text)
+			if trimmed == "" {
+				allRows = append(allRows, displayRow{prefix: "", text: "", style: cPast})
 				continue
 			}
 
-			text := truncate(synced[idx].Text, innerW-3)
-			if idx == activeIdx {
-				contentLines = append(contentLines, cActive.Render("▶ "+text))
-			} else {
-				contentLines = append(contentLines, cDim.Render("  "+text))
+			isActive := (i == activeLineIdx)
+			isPast := (i < activeLineIdx)
+
+			style := cFuture
+			if isActive {
+				style = cActive
+				activeRowIdx = len(allRows)
+			} else if isPast {
+				style = cPast
+			}
+
+			chunks := wrapWords(trimmed, maxTextW)
+			for chunkIdx, chunk := range chunks {
+				prefix := "  "
+				if isActive {
+					if chunkIdx == 0 {
+						prefix = "▶ "
+					} else {
+						prefix = "   "
+					}
+				} else if chunkIdx > 0 {
+					prefix = "   "
+				}
+				allRows = append(allRows, displayRow{
+					prefix: prefix,
+					text:   chunk,
+					style:  style,
+				})
 			}
 		}
 	} else {
 		// Plain lyrics
-		plain := m.lyrics.PlainLyrics
-		start := m.scrollOff
-		if start < 0 {
-			start = 0
-		}
-		for r := 0; r < innerH; r++ {
-			idx := start + r
-			if idx >= len(plain) {
-				contentLines = append(contentLines, "")
-			} else {
-				contentLines = append(contentLines, cDim.Render(truncate(plain[idx], innerW)))
+		for _, line := range m.lyrics.PlainLyrics {
+			trimmed := strings.TrimSpace(line)
+			if trimmed == "" {
+				allRows = append(allRows, displayRow{prefix: "", text: "", style: cPast})
+				continue
+			}
+			chunks := wrapWords(trimmed, innerW)
+			for _, chunk := range chunks {
+				allRows = append(allRows, displayRow{
+					prefix: "",
+					text:   chunk,
+					style:  cFuture,
+				})
 			}
 		}
 	}
 
-	// Pad/crop to innerH
-	for len(contentLines) < innerH {
-		contentLines = append(contentLines, "")
+	// Calculate visible slice centered on active line
+	start := 0
+	if m.lyrics != nil && m.lyrics.HasSynced {
+		centerRow := innerH / 2
+		start = activeRowIdx - centerRow + m.scrollOff
+		if start < 0 {
+			start = 0
+		}
+		if len(allRows) > innerH && start > len(allRows)-innerH {
+			start = len(allRows) - innerH
+		}
+	} else {
+		start = m.scrollOff
+		if start < 0 {
+			start = 0
+		}
 	}
-	if len(contentLines) > innerH {
-		contentLines = contentLines[:innerH]
+
+	var contentLines []string
+	for r := 0; r < innerH; r++ {
+		idx := start + r
+		if idx < len(allRows) {
+			row := allRows[idx]
+			rendered := row.style.Render(row.prefix + row.text)
+			contentLines = append(contentLines, rendered)
+		} else {
+			contentLines = append(contentLines, "")
+		}
 	}
 
 	var renderedRows []string
@@ -175,16 +230,26 @@ func (m *Model) View() string {
 	return strings.Join(renderedRows, "\n")
 }
 
-func truncate(s string, maxLen int) string {
-	if maxLen <= 0 {
-		return ""
+func wrapWords(text string, maxW int) []string {
+	if maxW <= 0 {
+		return []string{text}
 	}
-	if utf8.RuneCountInString(s) <= maxLen {
-		return s
+	words := strings.Fields(text)
+	if len(words) == 0 {
+		return []string{""}
 	}
-	runes := []rune(s)
-	if maxLen <= 1 {
-		return "…"
+
+	var res []string
+	curr := words[0]
+
+	for _, w := range words[1:] {
+		if utf8.RuneCountInString(curr)+1+utf8.RuneCountInString(w) <= maxW {
+			curr += " " + w
+		} else {
+			res = append(res, curr)
+			curr = w
+		}
 	}
-	return string(runes[:maxLen-1]) + "…"
+	res = append(res, curr)
+	return res
 }

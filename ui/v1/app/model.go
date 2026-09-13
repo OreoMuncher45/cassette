@@ -9,6 +9,7 @@ import (
 
 	"charm.land/bubbles/v2/help"
 	tea "charm.land/bubbletea/v2"
+	"cassette/core/artwork"
 	"cassette/core/auth"
 	"cassette/core/logger"
 	corelyrics "cassette/core/lyrics"
@@ -40,6 +41,7 @@ type Model struct {
 	mediaCenter        mediacenter.Model
 	lastLyricsTrack    string
 	lastLyricsArtist   string
+	lastArtworkURL     string
 	width              int
 	height             int
 	help               help.Model
@@ -106,6 +108,12 @@ type lyricsLoadedMsg struct {
 type queueLoadedMsg struct {
 	queue *spotapi.Queue
 	err   error
+}
+
+type artworkLoadedMsg struct {
+	imageURL string
+	ansi     string
+	err      error
 }
 
 func NewModel() *Model {
@@ -288,6 +296,17 @@ func (m *Model) fetchQueueCmd() tea.Cmd {
 	}
 }
 
+func (m *Model) fetchArtworkCmd(imageURL string, cols, rows int) tea.Cmd {
+	return func() tea.Msg {
+		ansi, err := artwork.GetRenderer().Render(context.Background(), imageURL, cols, rows)
+		return artworkLoadedMsg{
+			imageURL: imageURL,
+			ansi:     ansi,
+			err:      err,
+		}
+	}
+}
+
 func (m *Model) quitAfterFatalError() tea.Cmd {
 	return func() tea.Msg {
 		time.Sleep(2 * time.Second)
@@ -361,6 +380,13 @@ func (m *Model) updatePlayerStatus() {
 		TrackName:   m.songInfo.Title,
 		ArtistName:  m.songInfo.Artist,
 	})
+	m.mediaCenter.SetNowPlayingSong(m.songInfo)
+	m.mediaCenter.SetNowPlayingVolume(m.volumeInfo)
+	devName := "cassette (PC)"
+	if m.player != nil && m.player.GetDeviceName() != "" {
+		devName = m.player.GetDeviceName()
+	}
+	m.mediaCenter.SetNowPlayingStatus(m.playing, devName, shuffled)
 }
 
 func (m *Model) playPause() error {
