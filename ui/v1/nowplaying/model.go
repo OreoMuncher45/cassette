@@ -5,6 +5,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"cassette/core/theme"
 	"cassette/ui/v1/common"
 	"charm.land/lipgloss/v2"
 )
@@ -56,12 +57,13 @@ func (m *Model) View() string {
 		return ""
 	}
 
-	cBorder := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+	th := theme.Get()
+	cBorder := lipgloss.NewStyle().Foreground(th.BorderColor())
 	cTrack := lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
-	cArtist := lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
-	cAlbum := lipgloss.NewStyle().Foreground(lipgloss.Color("246"))
+	cArtist := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true)
+	cAlbum := lipgloss.NewStyle().Foreground(th.SecondaryColor())
 	cMeta := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
-	cStatus := lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
+	cStatus := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true)
 	if !m.playing {
 		cStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Bold(true)
 	}
@@ -114,7 +116,7 @@ func (m *Model) View() string {
 
 	artBoxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("242")).
+		BorderForeground(th.BorderColor()).
 		Padding(0, 1)
 
 	renderedArtBox := artBoxStyle.Render(artBlock)
@@ -156,7 +158,7 @@ func (m *Model) View() string {
 		sliderW = 6
 	}
 
-	slider := renderSlider(pos, dur, sliderW)
+	slider := renderSlider(pos, dur, sliderW, th)
 	progressLine := cMeta.Render(posStr+" ") + slider + cMeta.Render(" "+durStr)
 
 	// Status Line
@@ -170,7 +172,7 @@ func (m *Model) View() string {
 	}
 	shufStr := "OFF"
 	if m.shuffled {
-		shufStr = "ON"
+		shufStr = "ON 🔀"
 	}
 	statusLine := fmt.Sprintf("%s  •  Device: %s  •  Vol: %d%%  •  Shuffle: %s",
 		cStatus.Render(statusText),
@@ -197,7 +199,7 @@ func (m *Model) View() string {
 	detailsContent := strings.Join(detailsLines, "\n")
 	renderedDetailsBox := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("242")).
+		BorderForeground(th.BorderColor()).
 		Width(detailsW).
 		Height(artBoxH).
 		Padding(0, 1).
@@ -206,7 +208,7 @@ func (m *Model) View() string {
 	return lipgloss.JoinHorizontal(lipgloss.Top, renderedArtBox, renderedDetailsBox)
 }
 
-func renderSlider(pos, dur, width int) string {
+func renderSlider(pos, dur, width int, th *theme.Manager) string {
 	if width <= 0 {
 		return ""
 	}
@@ -226,7 +228,7 @@ func renderSlider(pos, dur, width int) string {
 		knobPos = width - 1
 	}
 
-	cDone := lipgloss.NewStyle().Foreground(lipgloss.Color("14"))
+	cDone := lipgloss.NewStyle().Foreground(th.PrimaryColor())
 	cKnob := lipgloss.NewStyle().Foreground(lipgloss.Color("15")).Bold(true)
 	cRest := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 

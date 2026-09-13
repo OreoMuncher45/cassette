@@ -6,6 +6,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"cassette/core/theme"
 )
 
 const (
@@ -122,15 +124,16 @@ func (c *cassette) View() string {
 		rightTape = " ███"
 	}
 
-	// Styles matching the Reddit ANSI cassette aesthetic
-	cGray := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
+	// Dynamic styles from theme engine (with breathing / rainbow support)
+	th := theme.Get()
+	cGray := lipgloss.NewStyle().Foreground(lipgloss.Color(th.BorderHex()))
 	cDark := lipgloss.NewStyle().Foreground(lipgloss.Color("238"))
-	cCyan := lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
+	cCyan := lipgloss.NewStyle().Foreground(lipgloss.Color(th.PrimaryHex())).Bold(true)
 	cWhite := lipgloss.NewStyle().Foreground(lipgloss.Color("254"))
-	cTrack := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true)
-	cGreen := lipgloss.NewStyle().Foreground(lipgloss.Color("10")).Bold(true)
+	cTrack := lipgloss.NewStyle().Foreground(lipgloss.Color(th.SecondaryHex())).Bold(true)
+	cGreen := lipgloss.NewStyle().Foreground(lipgloss.Color(th.PrimaryHex())).Bold(true)
 	cArtist := lipgloss.NewStyle().Foreground(lipgloss.Color("15"))
-	cStatus := lipgloss.NewStyle().Foreground(lipgloss.Color("13")).Bold(true)
+	cStatus := lipgloss.NewStyle().Foreground(lipgloss.Color(th.PrimaryHex())).Bold(true)
 
 	// Line 0: Top outer shell with textured shading (width 74)
 	l0 := cGray.Render("╭" + strings.Repeat("░", W-2) + "╮")

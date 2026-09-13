@@ -180,6 +180,18 @@ func (m *Model) IsOpen() bool {
 	return m.leftPanel == LeftPanelLibrary
 }
 
+func (m *Model) CycleLibraryNext() tea.Cmd {
+	return m.mediaPanel.ActivateNextPanel()
+}
+
+func (m *Model) CycleLibraryPrev() tea.Cmd {
+	return m.mediaPanel.ActivatePrevPanel()
+}
+
+func (m *Model) LibraryDepth() int {
+	return m.mediaPanel.Depth()
+}
+
 func (m *Model) InfoOpen() bool {
 	return m.mediaPanel.InfoOpen()
 }

@@ -13,7 +13,21 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		if m.searchFocused {
+			if msg.String() == "tab" {
+				m.blurSearch()
+				return m.activateNextPanel()
+			}
+			if msg.String() == "shift+tab" || msg.String() == "backtab" {
+				m.blurSearch()
+				return m.activatePrevPanel()
+			}
 			return m.updateSearchInput(msg)
+		}
+		if msg.String() == "tab" || key.Matches(msg, m.keys.CycleLibrary) {
+			return m.activateNextPanel()
+		}
+		if msg.String() == "shift+tab" || msg.String() == "backtab" {
+			return m.activatePrevPanel()
 		}
 		if key.Matches(msg, m.keys.MoreInfo) {
 			return m.toggleInfo()
@@ -44,9 +58,6 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 				return m.clearSearchAndReload()
 			}
 			return m.activePanel().SetStatus("Library")
-		}
-		if key.Matches(msg, m.keys.CycleLibrary) {
-			return m.activateNextPanel()
 		}
 	}
 	beforeSelection := ""
@@ -88,6 +99,12 @@ func (m *Model) activateNextPanel() tea.Cmd {
 	return m.activePanel().Prepare(m.searchQuery)
 }
 
+func (m *Model) activatePrevPanel() tea.Cmd {
+	m.active = (m.active - 1 + len(m.panels)) % len(m.panels)
+	m.syncInfoContent(true)
+	return m.activePanel().Prepare(m.searchQuery)
+}
+
 func (m *Model) updateSearchInput(msg tea.KeyPressMsg) tea.Cmd {
 	if key.Matches(msg, m.keys.Cancel) {
 		m.blurSearch()
@@ -111,8 +128,11 @@ func (p *panel) Update(msg tea.Msg, keys common.AppKeyMap) tea.Cmd {
 		switch {
 		case key.Matches(msg, keys.Select):
 			cmds := []tea.Cmd{}
-			if req, ok := p.selectedAction(); ok {
-				cmds = append(cmds, func() tea.Msg { return req })
+			if reqs, ok := p.selectedActions(); ok {
+				for _, req := range reqs {
+					r := req
+					cmds = append(cmds, func() tea.Msg { return r })
+				}
 			}
 			return tea.Batch(cmds...)
 		case key.Matches(msg, keys.NextPage):
@@ -124,6 +144,10 @@ func (p *panel) Update(msg tea.Msg, keys common.AppKeyMap) tea.Cmd {
 			}
 			return tea.Batch(cmds...)
 		case key.Matches(msg, keys.PrevPage):
+			if p.lists.Len() > 1 && msg.String() == "left" {
+				p.lists.Pop()
+				return p.activeList().SetStatus("Back")
+			}
 			cmds := []tea.Cmd{}
 			if req, ok := p.activeList().PrevPageRequest(); ok {
 				cmds = append(cmds, func() tea.Msg { return req })
@@ -162,30 +186,40 @@ func (p *panel) SetContent(entities []common.Entity, kind common.ListKind, pagin
 	return cmd
 }
 
-func (p *panel) selectedAction() (common.MediaRequest, bool) {
+func (p *panel) selectedActions() ([]common.MediaRequest, bool) {
 	entity, ok := p.activeList().SelectedEntity()
 	if !ok {
-		return common.MediaRequest{}, false
+		return nil, false
 	}
 	kind := p.activeList().Kind()
 	p.prepareForKind(kind)
 	switch kind {
 	case common.Playlists:
-		return common.MediaRequest{Kind: common.GetPlaylistTracks, PanelKind: p.kind, Page: 1, EntityURI: entity.ID, ShowLoading: true}, true
+		return []common.MediaRequest{
+			{Kind: common.PlayTrack, PanelKind: p.kind, EntityURI: entity.ID, ContextURI: entity.ID, ShowLoading: false},
+			{Kind: common.GetPlaylistTracks, PanelKind: p.kind, Page: 1, EntityURI: entity.ID, ShowLoading: true},
+		}, true
 	case common.Artists:
-		return common.MediaRequest{Kind: common.GetArtistAlbums, PanelKind: p.kind, Page: 1, EntityURI: entity.ID, ShowLoading: true}, true
+		return []common.MediaRequest{
+			{Kind: common.GetArtistAlbums, PanelKind: p.kind, Page: 1, EntityURI: entity.ID, ShowLoading: true},
+		}, true
 	case common.Albums:
-		return common.MediaRequest{Kind: common.GetAlbumTracks, PanelKind: p.kind, Page: 1, EntityURI: entity.ID, ShowLoading: true}, true
+		return []common.MediaRequest{
+			{Kind: common.PlayTrack, PanelKind: p.kind, EntityURI: entity.ID, ContextURI: entity.ID, ShowLoading: false},
+			{Kind: common.GetAlbumTracks, PanelKind: p.kind, Page: 1, EntityURI: entity.ID, ShowLoading: true},
+		}, true
 	case common.Tracks:
-		return common.MediaRequest{
-			Kind:        common.PlayTrack,
-			PanelKind:   p.kind,
-			EntityURI:   entity.ID,
-			ContextURI:  p.activeList().Request().EntityURI,
-			ShowLoading: false,
+		return []common.MediaRequest{
+			{
+				Kind:        common.PlayTrack,
+				PanelKind:   p.kind,
+				EntityURI:   entity.ID,
+				ContextURI:  p.activeList().Request().EntityURI,
+				ShowLoading: false,
+			},
 		}, true
 	default:
-		return common.MediaRequest{}, false
+		return nil, false
 	}
 }
 

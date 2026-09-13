@@ -219,21 +219,61 @@ Simply run:
 cassette
 ```
 
-### Keybindings
+### Keybindings & Controls
 
-| Key | Action |
-|---|---|
-| `Space` | Play / Pause |
-| `n` | Next Track |
-| `p` | Previous Track |
-| `+` / `-` | Volume Up / Down |
-| `>` / `<` | Seek Forward / Backward (5s) |
-| `s` | Toggle Shuffle |
-| `/` | Search Tracks, Artists, Playlists |
-| `Tab` / `P` | Toggle Library / Media Panel |
-| `d` | Switch Playback Device |
-| `?` | Toggle Help Menu |
-| `Ctrl+C` | Quit |
+The bottom bar provides quick access to both manager interfaces: `F1 - Keybinds  •  F2 - Settings`.
+
+| Key | Action | Description |
+|---|---|---|
+| **`F1`** | **Keybindings Manager** | Instant searchable keybinds manager with live rebinding (`Enter` to rebind, `Ctrl+R` to reset defaults) |
+| **`F2`** | **Visuals & Settings** | Dynamic album art reactive color extraction, RGB effects, themes, and animation speeds |
+| `Space` | Play / Pause | Toggle playback on active device |
+| `s` | Toggle Shuffle | Turn shuffle on or off (displays `Shuffle: ON 🔀` / `OFF` HUD toast) |
+| `n` | Next Track | Skip to next track in queue |
+| `p` | Previous Track | Restart song or go to previous track |
+| `+` / `-` | Volume Up / Down | Increase or decrease volume by 5% |
+| `>` / `<` | Seek Forward / Back | Jump forward or backward by 5 seconds |
+| `/` | Search Library | Search tracks, artists, albums, and playlists |
+| `Tab` | Cycle Search Tabs | In search/library, switch between `PL` (Playlists) → `TR` (Tracks) → `AL` (Albums) → `AR` (Artists) |
+| `Shift+Tab` | Reverse Cycle Tabs | Cycle search tabs in reverse order |
+| `Left` / `Del` | Navigate Back / Queue | Return to parent list when drilled down, or return focus to Queue at root level |
+| `Enter` | Select / Play | In `PL`, plays the full playlist context; in `TR`, plays the track & starts Endless Song Radio |
+| `l` | Toggle Lyrics | Open / close real-time synced lyrics panel |
+| `a` | Toggle Big Artwork | Open / close 24-bit Truecolor terminal album art panel |
+| `q` | Toggle Queue | Open / close playback queue panel |
+| `d` | Switch Playback Device | Open Spotify Connect device selector |
+| `z` | Zen Mode | Focus mode: hides side panels, showing only the spinning cassette deck |
+| `Ctrl+C` | Quit | Cleanly exit Cassette |
+
+---
+
+### Visual Settings & Themes (`F2`)
+
+Press **`F2`** at any time to open the visual customization engine:
+
+* **11+ Color Schemes**:
+  * **Album Art Reactive**: Automatically samples the currently playing song's album art in real-time, extracting the most vibrant accent palette.
+  * **Retro Cassette Cyan**: Classic Hi-Fi turquoise and warm amber HUD.
+  * **Cyberpunk Neon**: High-contrast hot neon pink and electric cyan.
+  * **Synthwave 80s**: Retro sunset purple and laser neon orange.
+  * **Matrix Phosphor**: Green CRT hacker terminal phosphor glow.
+  * **Dracula Dark**: Vampire purple, radiant pink, and sky cyan.
+  * **Nordic Frost**: Arctic ice blue and calm polar slate.
+  * **Monochrome Amber**: Vintage warm amber cassette deck display.
+  * **Tokyo Night**: Deep indigo midnight and pastel magenta.
+  * **Solarized Dark**: Balanced teal cyan and solar amber gold.
+  * **Pastel Dream**: Soft pastel pink and dreamy sky blue.
+
+* **Live Visual Effects**:
+  * **Breathing Glow**: Smooth sine-wave brightness pulsing across spools, HUD borders, and accents.
+  * **Rainbow RGB Cycle**: Dynamic 360° chromatic wave cycling through the full color spectrum.
+  * **Heartbeat Pulse**: Rhythmic bass pulse synced to playback.
+  * **Static Colors**: Pure, distraction-free solid theme styling.
+
+* **RGB & Animation Speeds**:
+  * **Chill (Slow)** • **Groove (Medium)** • **Hyper (Fast)** • **Ultra (Ludicrous)**
+
+All settings are automatically saved and persistent across sessions.
 
 ---
 

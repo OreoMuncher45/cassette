@@ -91,6 +91,12 @@ func (r *Renderer) Render(ctx context.Context, imageURL string, cols, rows int) 
 	return out, nil
 }
 
+func (r *Renderer) GetCachedPath(url string) string {
+	h := md5.Sum([]byte(url))
+	fileName := hex.EncodeToString(h[:]) + ".jpg"
+	return filepath.Join(r.cacheDir, fileName)
+}
+
 func (r *Renderer) ensureDownloaded(ctx context.Context, url string) (string, error) {
 	h := md5.Sum([]byte(url))
 	fileName := hex.EncodeToString(h[:]) + ".jpg"

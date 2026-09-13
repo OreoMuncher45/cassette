@@ -5,6 +5,7 @@ import (
 	"unicode/utf8"
 
 	"cassette/core/lyrics"
+	"cassette/core/theme"
 	"charm.land/lipgloss/v2"
 )
 
@@ -75,9 +76,10 @@ func (m *Model) View() string {
 		h = 10
 	}
 
-	cGray := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
-	cCyan := lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
-	cActive := lipgloss.NewStyle().Foreground(lipgloss.Color("14")).Bold(true)
+	th := theme.Get()
+	cGray := lipgloss.NewStyle().Foreground(th.BorderColor())
+	cCyan := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true)
+	cActive := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true)
 	cFuture := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	cPast := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
 	cNone := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))

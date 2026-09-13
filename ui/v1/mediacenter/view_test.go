@@ -106,10 +106,16 @@ func TestLyricsAndQueueDefaultAndToggles(t *testing.T) {
 		t.Fatalf("expected left panel to be library after tab, got %v", model.LeftPanel())
 	}
 
-	// Tab swaps back to Lyrics
+	// In Library, Tab cycles tabs (keeps Library open)
 	model.Update(tea.KeyPressMsg(tea.Key{Text: "tab", Code: tea.KeyTab}))
+	if model.LeftPanel() != LeftPanelLibrary {
+		t.Fatalf("expected left panel to stay library when cycling tabs, got %v", model.LeftPanel())
+	}
+
+	// L toggles back to Lyrics
+	model.Update(tea.KeyPressMsg(tea.Key{Text: "l", Code: 'l'}))
 	if model.LeftPanel() != LeftPanelLyrics {
-		t.Fatalf("expected left panel to be lyrics after second tab, got %v", model.LeftPanel())
+		t.Fatalf("expected left panel to be lyrics after pressing l, got %v", model.LeftPanel())
 	}
 
 	// Q toggles Queue

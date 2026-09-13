@@ -351,3 +351,66 @@ func requestForActiveList(model *Model) common.MediaRequest {
 
 	return request
 }
+
+func TestTabCyclesPanels(t *testing.T) {
+	model := NewModel(common.NewAppKeyMap())
+	if model.activePanel().kind != common.Playlists {
+		t.Fatalf("initial panel = %v, want Playlists", model.activePanel().kind)
+	}
+
+	// Tab -> Tracks
+	model.Update(tea.KeyPressMsg(tea.Key{Text: "tab", Code: tea.KeyTab}))
+	if model.activePanel().kind != common.Tracks {
+		t.Fatalf("panel after tab = %v, want Tracks", model.activePanel().kind)
+	}
+
+	// Tab -> Albums
+	model.Update(tea.KeyPressMsg(tea.Key{Text: "tab", Code: tea.KeyTab}))
+	if model.activePanel().kind != common.Albums {
+		t.Fatalf("panel after tab = %v, want Albums", model.activePanel().kind)
+	}
+
+	// Tab -> Artists
+	model.Update(tea.KeyPressMsg(tea.Key{Text: "tab", Code: tea.KeyTab}))
+	if model.activePanel().kind != common.Artists {
+		t.Fatalf("panel after tab = %v, want Artists", model.activePanel().kind)
+	}
+
+	// Shift+Tab -> Albums
+	model.Update(tea.KeyPressMsg(tea.Key{Text: "shift+tab"}))
+	if model.activePanel().kind != common.Albums {
+		t.Fatalf("panel after shift+tab = %v, want Albums", model.activePanel().kind)
+	}
+}
+
+func TestPlaylistSelectionYieldsPlaybackContext(t *testing.T) {
+	model := NewModel(common.NewAppKeyMap())
+	setActivePanelContent(t, &model, []common.Entity{
+		common.NewEntity("My Playlist", "Description", "spotify:playlist:test1234", ""),
+	})
+
+	reqs, ok := model.activePanel().selectedActions()
+	if !ok {
+		t.Fatal("expected selectedActions to succeed")
+	}
+	if len(reqs) < 2 {
+		t.Fatalf("len(reqs) = %d, want at least 2", len(reqs))
+	}
+
+	playReq := reqs[0]
+	if playReq.Kind != common.PlayTrack {
+		t.Fatalf("req[0] kind = %v, want PlayTrack", playReq.Kind)
+	}
+	if playReq.ContextURI != "spotify:playlist:test1234" {
+		t.Fatalf("playReq.ContextURI = %q, want spotify:playlist:test1234", playReq.ContextURI)
+	}
+
+	tracksReq := reqs[1]
+	if tracksReq.Kind != common.GetPlaylistTracks {
+		t.Fatalf("req[1] kind = %v, want GetPlaylistTracks", tracksReq.Kind)
+	}
+	if tracksReq.EntityURI != "spotify:playlist:test1234" {
+		t.Fatalf("tracksReq.EntityURI = %q, want spotify:playlist:test1234", tracksReq.EntityURI)
+	}
+}
+

@@ -263,6 +263,18 @@ func (m *Model) CloseInfo() {
 	m.closeInfo()
 }
 
+func (m *Model) Depth() int {
+	return m.activePanel().depth()
+}
+
+func (m *Model) ActivateNextPanel() tea.Cmd {
+	return m.activateNextPanel()
+}
+
+func (m *Model) ActivatePrevPanel() tea.Cmd {
+	return m.activatePrevPanel()
+}
+
 func (p *panel) depth() int {
 	return p.lists.Len()
 }
@@ -270,3 +282,4 @@ func (p *panel) depth() int {
 func (p *panel) resetToRoot() {
 	p.lists.Items = []medialist.Model{medialist.NewModel(p.kind)}
 }
+

@@ -3,14 +3,21 @@ package mediapanel
 import (
 	"strings"
 
-	"charm.land/lipgloss/v2"
+	"cassette/core/theme"
 	"cassette/ui/v1/common"
+	"charm.land/lipgloss/v2"
 )
 
 const preferredInfoHeight = 7
 
 func (m *Model) View() string {
-	panelShell := m.styles.panel.Width(m.width).Height(m.height).Render("")
+	th := theme.Get()
+	panelShell := lipgloss.NewStyle().
+		BorderStyle(lipgloss.RoundedBorder()).
+		BorderForeground(th.BorderColor()).
+		Width(m.width).
+		Height(m.height).
+		Render("")
 	panelNav := m.renderPanelNav()
 	searchLine := m.renderSearchLine()
 	searchHeight := lipgloss.Height(searchLine)
@@ -42,6 +49,10 @@ func (m *Model) View() string {
 }
 
 func (m *Model) renderPanelNav() string {
+	th := theme.Get()
+	activeStyle := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true)
+	mutedStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("244"))
+
 	segments := []struct {
 		label string
 		kind  common.ListKind
@@ -55,12 +66,12 @@ func (m *Model) renderPanelNav() string {
 	parts := make([]string, 0, len(segments))
 	for _, segment := range segments {
 		if m.activePanel().kind == segment.kind {
-			parts = append(parts, m.styles.panelNavActive.Render(segment.label))
+			parts = append(parts, activeStyle.Render("["+segment.label+"]"))
 			continue
 		}
-		parts = append(parts, m.styles.panelNavMuted.Render(segment.label))
+		parts = append(parts, mutedStyle.Render(" "+segment.label+" "))
 	}
-	return m.styles.panelNav.Render(strings.Join(parts, " - "))
+	return strings.Join(parts, " • ")
 }
 
 func (m *Model) renderSearchLine() string {

@@ -99,7 +99,13 @@ func (p *Player) PlayTrack(ctx context.Context, uri string, contextURI string) e
 		opts = &spotify.PlayOptions{}
 	}
 
-	if strings.HasPrefix(contextURI, "spotify:playlist:") || strings.HasPrefix(contextURI, "spotify:album:") || strings.HasPrefix(contextURI, "spotify:artist:") {
+	isContextURI := strings.HasPrefix(uri, "spotify:playlist:") || strings.HasPrefix(uri, "spotify:album:") || strings.HasPrefix(uri, "spotify:artist:")
+	isContextPlayback := strings.HasPrefix(contextURI, "spotify:playlist:") || strings.HasPrefix(contextURI, "spotify:album:") || strings.HasPrefix(contextURI, "spotify:artist:")
+
+	if isContextURI {
+		ctxURI := spotify.URI(uri)
+		opts.PlaybackContext = &ctxURI
+	} else if isContextPlayback {
 		ctxURI := spotify.URI(contextURI)
 		opts.PlaybackContext = &ctxURI
 		if uri != "" && uri != contextURI {
@@ -111,13 +117,18 @@ func (p *Player) PlayTrack(ctx context.Context, uri string, contextURI string) e
 
 	logger.Log.Info().Str("uri", uri).Str("context_uri", contextURI).Any("device", opts.DeviceID).Msg("playing track via web api")
 	err := p.client.PlayOpt(ctx, opts)
+	if err != nil && opts.PlaybackOffset != nil {
+		// Fallback without offset in case Spotify API rejected the specific track offset
+		opts.PlaybackOffset = nil
+		err = p.client.PlayOpt(ctx, opts)
+	}
 	if err != nil {
 		logger.Log.Error().Err(err).Msg("failed to play track")
 		return err
 	}
 
-	// Trigger endless song radio when playing an individual track (e.g. from search)
-	if contextURI == "" && strings.HasPrefix(uri, "spotify:track:") {
+	// Trigger endless song radio ONLY when playing an individual track without context
+	if !isContextPlayback && !isContextURI && strings.HasPrefix(uri, "spotify:track:") {
 		go p.queueSongRadio(uri)
 	}
 

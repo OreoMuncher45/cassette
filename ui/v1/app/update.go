@@ -5,8 +5,10 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
+	"cassette/core/artwork"
 	"cassette/core/logger"
 	coreplayer "cassette/core/player"
+	"cassette/core/theme"
 	"cassette/core/ticker"
 	uiauth "cassette/ui/v1/auth"
 	"cassette/ui/v1/common"
@@ -37,6 +39,22 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// If keybinds modal is open, route input to it
+	if m.keybindsModel.IsOpen() {
+		kbCmd, handled := m.keybindsModel.Update(msg)
+		if handled {
+			return m, kbCmd
+		}
+	}
+
+	// If settings modal is open, route input to it
+	if m.settingsModel.IsOpen() {
+		settCmd, handled := m.settingsModel.Update(msg)
+		if handled {
+			return m, settCmd
+		}
+	}
+
 	// If device selection screen is active, route input to it
 	if m.devicePickerOpen && m.devicesModel != nil {
 		if devMsg, ok := msg.(tea.KeyPressMsg); ok && devMsg.String() == "r" {
@@ -65,10 +83,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	if m.mediaCenter.IsOpen() {
-		return m, centerCmd
-	}
-
 	if cmd, handled := m.handleTransportInput(msg, centerCmd); handled {
 		return m, cmd
 	}
@@ -79,8 +93,14 @@ func (m *Model) handleShellInput(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch {
+		case key.Matches(msg, m.keys.OpenKeybinds):
+			m.keybindsModel.Open()
+			return nil, true
+		case key.Matches(msg, m.keys.OpenSettings):
+			m.settingsModel.Open()
+			return nil, true
 		case key.Matches(msg, m.keys.ToggleHelp):
-			m.help.ShowAll = !m.help.ShowAll
+			m.keybindsModel.Open()
 			return nil, true
 		case key.Matches(msg, m.keys.Quit):
 			return tea.Quit, true
@@ -144,6 +164,7 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		m.devicePickerOpen = false
 		return nil, true
 	case ticker.TickFastMsg:
+		theme.Get().Tick()
 		m.advancePlayback(180)
 		m.mediaCenter.TickPlayer(m.playing)
 		m.mediaCenter.SetLyricsPosition(m.songInfo.Position)
@@ -255,6 +276,8 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 	case artworkLoadedMsg:
 		if msg.err == nil && msg.imageURL == m.lastArtworkURL {
 			m.mediaCenter.SetArtwork(msg.ansi)
+			cachePath := artwork.GetRenderer().GetCachedPath(msg.imageURL)
+			theme.Get().ExtractPaletteFromImage(cachePath)
 		}
 		return nil, true
 	case mediaLoadedMsg:
@@ -290,6 +313,11 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		return tea.Batch(m.mediaCenter.ShowVolume(), m.pollPlayerStateCmd()), true
 	case shuffleOkMsg:
 		m.updatePlayerStatus()
+		text := "Shuffle: OFF"
+		if msg.shuffled {
+			text = "Shuffle: ON 🔀"
+		}
+		m.mediaCenter.SetDisplay(text)
 		return m.pollPlayerStateCmd(), true
 	case transportErrMsg:
 		logger.Log.Error().Err(msg.err).Str("action", msg.action).Msg("transport action failed")

@@ -3,12 +3,12 @@ package app
 import (
 	"fmt"
 
+	"cassette/core/theme"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
 
 func (m *Model) View() tea.View {
-	helpStyle := lipgloss.NewStyle().Foreground(lipgloss.BrightBlack)
 	if m.fatalErr != nil {
 		title := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.BrightRed).Render("Error")
 		message := lipgloss.NewStyle().MarginTop(1).Align(lipgloss.Center).Render(fmt.Sprintf("%v", m.fatalErr))
@@ -25,17 +25,46 @@ func (m *Model) View() tea.View {
 	}
 
 	mediaCenterView := m.mediaCenter.View(m.width, m.height)
-	helpKeys := m.keys.WithMediaPanelOpen(m.mediaCenter.IsOpen()).WithInfoOpen(m.mediaCenter.InfoOpen())
-	helpLine := helpStyle.Width(m.width).Align(lipgloss.Center).Render(m.help.View(helpKeys))
-	if m.viewportTooSmall(mediaCenterView, helpLine) {
-		return tea.NewView(m.smallViewportView(mediaCenterView, helpLine))
+
+	th := theme.Get()
+	cKey := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true)
+	cLabel := lipgloss.NewStyle().Foreground(lipgloss.Color("250"))
+	cDot := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+
+	bottomContent := fmt.Sprintf("%s %s   %s   %s %s",
+		cKey.Render("F1"),
+		cLabel.Render("Keybinds"),
+		cDot.Render("•"),
+		cKey.Render("F2"),
+		cLabel.Render("Settings"),
+	)
+	bottomBar := lipgloss.NewStyle().Width(m.width).Align(lipgloss.Center).Render(bottomContent)
+
+	if m.viewportTooSmall(mediaCenterView, bottomBar) {
+		return tea.NewView(m.smallViewportView(mediaCenterView, bottomBar))
 	}
 	modelView := lipgloss.NewStyle().Width(m.width).Height(m.height).Align(lipgloss.Center, lipgloss.Center).Render(mediaCenterView)
 	layers := []*lipgloss.Layer{
 		lipgloss.NewLayer(modelView).ID("model"),
 	}
 	if !m.mediaCenter.IsZenMode() {
-		layers = append(layers, lipgloss.NewLayer(helpLine).Y(m.height-lipgloss.Height(helpLine)).ID("help"))
+		layers = append(layers, lipgloss.NewLayer(bottomBar).Y(m.height-lipgloss.Height(bottomBar)).ID("bottomBar"))
+	}
+	if m.keybindsModel.IsOpen() {
+		kbView := lipgloss.NewStyle().
+			Width(m.width).
+			Height(m.height).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(m.keybindsModel.View())
+		layers = append(layers, lipgloss.NewLayer(kbView).ID("keybinds"))
+	}
+	if m.settingsModel.IsOpen() {
+		settView := lipgloss.NewStyle().
+			Width(m.width).
+			Height(m.height).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(m.settingsModel.View())
+		layers = append(layers, lipgloss.NewLayer(settView).ID("settings"))
 	}
 	return tea.NewView(lipgloss.NewCompositor(layers...).Render())
 }

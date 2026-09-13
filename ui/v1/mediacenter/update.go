@@ -12,6 +12,20 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 			return m.mediaPanel.Update(msg)
 		}
 
+		if m.leftPanel == LeftPanelLibrary {
+			if msg.String() == "tab" {
+				return m.CycleLibraryNext()
+			}
+			if msg.String() == "shift+tab" || msg.String() == "backtab" {
+				return m.CycleLibraryPrev()
+			}
+			if msg.String() == "left" && m.LibraryDepth() <= 1 {
+				m.CloseLibrary()
+				m.queueOpen = true
+				return nil
+			}
+		}
+
 		switch {
 		case key.Matches(msg, m.keys.ToggleLyrics):
 			m.ToggleLyrics()
@@ -23,6 +37,9 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 			m.ToggleQueue()
 			return nil
 		case key.Matches(msg, m.keys.TogglePanel):
+			if m.leftPanel == LeftPanelLibrary {
+				return m.CycleLibraryNext()
+			}
 			if msg.String() == "tab" {
 				m.SwapLeftPanel()
 			} else {
@@ -40,3 +57,4 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 	}
 	return m.mediaPanel.Update(msg)
 }
+

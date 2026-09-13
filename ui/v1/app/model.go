@@ -20,8 +20,10 @@ import (
 	uiauth "cassette/ui/v1/auth"
 	"cassette/ui/v1/common"
 	"cassette/ui/v1/devices"
+	"cassette/ui/v1/keybinds"
 	"cassette/ui/v1/mediacenter"
 	"cassette/ui/v1/player"
+	"cassette/ui/v1/settings"
 	spotapi "github.com/zmb3/spotify/v2"
 )
 
@@ -29,6 +31,8 @@ type Model struct {
 	authModel          *uiauth.Model
 	devicesModel       *devices.Model
 	devicePickerOpen   bool
+	keybindsModel      keybinds.Model
+	settingsModel      settings.Model
 	playing            bool
 	playerReady        bool
 	songInfo           common.SongInfo
@@ -92,7 +96,9 @@ type transportErrMsg struct {
 	action string
 }
 
-type shuffleOkMsg struct{}
+type shuffleOkMsg struct {
+	shuffled bool
+}
 
 type fatalErrMsg struct {
 	err error
@@ -121,12 +127,14 @@ type artworkLoadedMsg struct {
 func NewModel() *Model {
 	keys := common.NewAppKeyMap()
 	model := &Model{
-		authModel:    uiauth.NewModel(),
-		devicesModel: devices.NewModel(false),
-		mediaCenter:  mediacenter.NewModel(keys),
-		help:         newHelpModel(),
-		keys:         keys,
-		volumeInfo:   common.VolumeInfo{Volume: 50, Max: 100},
+		authModel:     uiauth.NewModel(),
+		devicesModel:  devices.NewModel(false),
+		keybindsModel: keybinds.NewModel(&keys),
+		settingsModel: settings.NewModel(),
+		mediaCenter:   mediacenter.NewModel(keys),
+		help:          newHelpModel(),
+		keys:          keys,
+		volumeInfo:    common.VolumeInfo{Volume: 50, Max: 100},
 	}
 	model.requestHandlers = map[common.MediaRequestKind]func(common.MediaRequest) tea.Cmd{
 		common.GetUserPlaylists:   model.handleGetUserPlaylists,
@@ -182,6 +190,8 @@ func (m *Model) setSize(width, height int) {
 	if m.devicesModel != nil {
 		m.devicesModel.SetSize(width, height)
 	}
+	m.keybindsModel.SetSize(width, height)
+	m.settingsModel.SetSize(width, height)
 }
 
 func (m *Model) shutdown() {
@@ -530,7 +540,7 @@ func (m *Model) shuffleCmd() tea.Cmd {
 		if err := m.shuffle(targetShuffle); err != nil {
 			return transportErrMsg{err: err, action: "Failed to toggle shuffle"}
 		}
-		return shuffleOkMsg{}
+		return shuffleOkMsg{shuffled: targetShuffle}
 	}
 }
 
