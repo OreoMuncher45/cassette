@@ -36,16 +36,93 @@
 
 ## Why does this exist? (The Rant)
 
-Every modern Spotify client has completely lost the plot:
+Because modern Spotify clients are fucking awful.
 
-1. **The Official Spotify Desktop App**: Consumes 2GB of RAM, renders web views inside web views, constantly shoves podcasts and unskippable clutter down your throat, and takes 10 seconds just to open a search bar.
-2. **Generic "Terminal" Spotify TUIs**: Most CLI players are dead, broken, abandoned, or sterile. They render lifeless white tables that look like a corporate tax audit. No style, no warmth, no joy.
-3. **The "Play on Device" Nightmare**: Half the terminal clients out there don't even play sound. You press play, and nothing happens because you have to spend 4 hours configuring external daemon sockets, broken D-Bus hooks, and third-party audio servers.
+Somehow, we managed to take **playing music** and turn it into an exercise in tolerating bloated software, shitty UX, and a dozen layers of bullshit that nobody asked for.
+
+1. **The Official Spotify Desktop App**
+
+   This thing is an absolute resource hog. Gigabytes of RAM to play fucking music. Web views inside web views inside whatever other Electron-flavored nightmare they've stuffed in there. Podcasts shoved in your face. Recommendations you didn't ask for. Clutter everywhere.
+
+   And somehow, despite all that horsepower, you can still sit there waiting for the goddamn search bar to become usable.
+
+2. **Generic "Terminal" Spotify TUIs**
+
+   Okay, so let's escape the bloated desktop app and use a terminal client.
+
+   Except half of them look like they were designed by someone whose idea of a UI is a white table dumped straight out of a database.
+
+   Lifeless rows. Lifeless borders. Lifeless text.
+
+   They technically work. Great. So does a fucking spreadsheet.
+
+   Music isn't supposed to feel like filing your taxes.
+
+3. **The "Play on Device" Fuckery**
+
+   And then there's the other brilliant idea: terminal clients that don't actually fucking play music.
+
+   You hit play.
+
+   Nothing.
+
+   Oh, right. You need to configure some external daemon, connect a D-Bus socket, install another audio server, sacrifice a goat to PulseAudio, and spend the next four hours figuring out why the goddamn thing still isn't making sound.
+
+   **No.**
+
+   I'm not doing that.
 
 **Enough.**
 
-**cassette** was built with a simple philosophy: **Music should feel like physical media again.**
-You get a handcrafted, pixel-aligned ANSI cassette tape that physically spins in real time inside your terminal. It connects directly to Spotify, features automated background playback with an integrated `librespot` engine, auto-queues endless song radio, and stays lightning fast.
+I built `cassette` out of pure spite because I wanted a Spotify client that didn't suck.
+
+The idea is stupidly simple:
+
+**Music should feel like physical media again.**
+
+So instead of another sterile terminal table, `cassette` gives you a handcrafted, pixel-aligned ANSI cassette tape that **actually spins while your music is playing**.
+
+The reels move. The tape transfers between the supply and take-up spools. The metadata sits in the HUD. The whole fucking thing lives inside your terminal.
+
+And, crucially, **it actually plays the music.**
+
+`cassette` connects directly to Spotify and bundles its own `librespot` engine, so your computer can show up natively as a Spotify Connect device without needing the official Spotify desktop app or some ridiculous pile of external audio daemons.
+
+Search for a track, press play, and you're listening.
+
+That's it.
+
+No Electron bloat.
+
+No podcast bullshit.
+
+No "please configure this external service before sound will come out of your speakers."
+
+No dead-ass terminal UI pretending that functionality is enough.
+
+Just Spotify, your keyboard, and a fucking cassette tape spinning in your terminal.
+
+---
+
+## Features
+
+* **Animated ANSI Cassette Art**
+  Handcrafted, pixel-aligned cassette animation with realistic rotating 6-tooth gear sprockets, calibrated tape window, dynamic supply/take-up spools, real-time tape transfer, and an integrated metadata HUD.
+
+* **Actually Plays Music**
+  Bundled native `librespot` Spotify Connect support. Your computer appears directly as `cassette` in Spotify. No official Spotify desktop client required. No external audio daemon circus.
+
+* **Endless Song Radio**
+  Start playing any track from search and `cassette` automatically seeds Spotify's similar-track recommendations, continuously building the queue so you can just let the fucking music run.
+
+* **Distraction-Free Keyboard Controls**
+  Search, browse playlists, tracks and albums, switch devices, control volume, seek, shuffle, and manage playback without touching a mouse.
+
+* **Zero Electron Bloat**
+  Written in pure Go with Bubble Tea and Lipgloss. Fast startup, low CPU usage, minimal memory footprint, and none of the bullshit that comes with shipping an entire browser just to play a song.
+
+* **Built Because We Wanted It**
+  Not because there was a gap in some corporate market analysis. Not because Spotify asked for another client. Because we wanted to listen to music in a terminal without hating the experience.
 
 ---
 
@@ -61,9 +138,9 @@ You get a handcrafted, pixel-aligned ANSI cassette tape that physically spins in
 
 ## Requirements
 
-- **Spotify Premium** account (required by Spotify for Web API playback & Spotify Connect).
-- **Linux** (PulseAudio / PipeWire).
-- **librespot** (installed on Arch via `pacman -S librespot`, or auto-detected by `cassette`).
+- **Spotify Premium** account (not something i can fix srry).
+- **Linux** (PulseAudio / PipeWire, go figure).
+- **librespot** (i wish i didnt have to use this).
 - Standard terminal with UTF-8 support (Kitty, Konsole, Alacritty, WezTerm, iTerm2, etc.).
 
 ---
