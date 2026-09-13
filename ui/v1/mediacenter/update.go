@@ -8,17 +8,30 @@ import (
 func (m *Model) Update(msg tea.Msg) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
+		if m.SearchFocused() {
+			return m.mediaPanel.Update(msg)
+		}
+
 		switch {
+		case key.Matches(msg, m.keys.ToggleLyrics):
+			m.ToggleLyrics()
+			return nil
+		case key.Matches(msg, m.keys.ToggleQueue):
+			m.ToggleQueue()
+			return nil
 		case key.Matches(msg, m.keys.TogglePanel):
-			m.mediaListOpen = !m.mediaListOpen
-			if !m.mediaListOpen {
-				m.mediaPanel.CloseInfo()
+			if msg.String() == "tab" {
+				m.SwapLeftPanel()
+			} else {
+				m.ToggleLibrary()
 			}
 			return nil
 		case key.Matches(msg, m.keys.ZenMode):
 			m.zenMode = !m.zenMode
+			return nil
 		}
-		if !m.mediaListOpen {
+
+		if m.leftPanel != LeftPanelLibrary {
 			return nil
 		}
 	}

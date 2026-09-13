@@ -69,6 +69,13 @@ func (p *Player) GetDevices(ctx context.Context) ([]spotify.PlayerDevice, error)
 	return devices, nil
 }
 
+func (p *Player) GetQueue(ctx context.Context) (*spotify.Queue, error) {
+	if p == nil || p.client == nil {
+		return nil, fmt.Errorf("spotify client is not initialized")
+	}
+	return p.client.GetQueue(ctx)
+}
+
 func (p *Player) TransferPlayback(ctx context.Context, deviceID spotify.ID, play bool) error {
 	if p == nil || p.client == nil {
 		return fmt.Errorf("spotify client is not initialized")

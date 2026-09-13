@@ -28,6 +28,8 @@ type AppKeyMap struct {
 	Shuffle        key.Binding
 	ZenMode        key.Binding
 	Devices        key.Binding
+	ToggleQueue    key.Binding
+	ToggleLyrics   key.Binding
 	MediaPanelOpen bool
 	InfoOpen       bool
 }
@@ -43,8 +45,8 @@ func NewAppKeyMap() AppKeyMap {
 			key.WithHelp("ctrl+c", "quit"),
 		),
 		CycleLibrary: key.NewBinding(
-			key.WithKeys("tab"),
-			key.WithHelp("tab", "next panel"),
+			key.WithKeys("c", "C"),
+			key.WithHelp("c", "next section"),
 		),
 		Search: key.NewBinding(
 			key.WithKeys("/"),
@@ -83,15 +85,15 @@ func NewAppKeyMap() AppKeyMap {
 			key.WithHelp("left/h/[", "prev page"),
 		),
 		TogglePanel: key.NewBinding(
-			key.WithKeys("P", "tab"),
-			key.WithHelp("P/tab", "library"),
+			key.WithKeys("tab", "P"),
+			key.WithHelp("tab", "library/lyrics"),
 		),
 		PlayPause: key.NewBinding(
 			key.WithKeys(" ", "space"),
 			key.WithHelp("space", "play/pause"),
 		),
 		SeekForward: key.NewBinding(
-			key.WithKeys(">", ".", "right", "l", "]"),
+			key.WithKeys(">", ".", "right", "]"),
 			key.WithHelp(">", "seek +"),
 		),
 		SeekBackward: key.NewBinding(
@@ -126,14 +128,22 @@ func NewAppKeyMap() AppKeyMap {
 			key.WithKeys("d"),
 			key.WithHelp("d", "devices"),
 		),
+		ToggleQueue: key.NewBinding(
+			key.WithKeys("q", "Q"),
+			key.WithHelp("q", "queue"),
+		),
+		ToggleLyrics: key.NewBinding(
+			key.WithKeys("l", "L"),
+			key.WithHelp("l", "lyrics"),
+		),
 	}
 }
 
 func (k AppKeyMap) ShortHelp() []key.Binding {
 	if k.MediaPanelOpen {
-		return []key.Binding{k.TogglePanel, k.Select, k.Search, k.Back, k.PlayPause, k.Devices, k.Quit}
+		return []key.Binding{k.TogglePanel, k.Select, k.Search, k.Back, k.PlayPause, k.ToggleLyrics, k.ToggleQueue, k.Devices, k.Quit}
 	}
-	return []key.Binding{k.PlayPause, k.NextTrack, k.PrevTrack, k.VolumeUp, k.VolumeDown, k.SeekForward, k.Shuffle, k.TogglePanel, k.Devices, k.Quit}
+	return []key.Binding{k.PlayPause, k.NextTrack, k.PrevTrack, k.VolumeUp, k.VolumeDown, k.ToggleLyrics, k.ToggleQueue, k.TogglePanel, k.Devices, k.Quit}
 }
 
 func (k AppKeyMap) FullHelp() [][]key.Binding {

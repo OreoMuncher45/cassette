@@ -125,14 +125,12 @@ func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
 					return DeviceSelectedMsg{Device: selected}
 				}
 			}
-		case "esc", "d":
+		case "esc", "d", "q":
 			if m.canDismiss {
 				return m, func() tea.Msg {
 					return DeviceDismissedMsg{}
 				}
 			}
-		case "q":
-			return m, tea.Quit
 		}
 	}
 	return m, nil

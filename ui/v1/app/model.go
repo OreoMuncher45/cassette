@@ -11,6 +11,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"cassette/core/auth"
 	"cassette/core/logger"
+	corelyrics "cassette/core/lyrics"
 	coreplayer "cassette/core/player"
 	"cassette/core/ticker"
 	"cassette/core/utils"
@@ -37,6 +38,8 @@ type Model struct {
 	localDaemon        *coreplayer.LocalDaemon
 	spotifyClient      *spotify.SpotifyClient
 	mediaCenter        mediacenter.Model
+	lastLyricsTrack    string
+	lastLyricsArtist   string
 	width              int
 	height             int
 	help               help.Model
@@ -92,6 +95,18 @@ type fatalErrMsg struct {
 }
 
 type fatalQuitMsg struct{}
+
+type lyricsLoadedMsg struct {
+	track  string
+	artist string
+	lyrics *corelyrics.Lyrics
+	err    error
+}
+
+type queueLoadedMsg struct {
+	queue *spotapi.Queue
+	err   error
+}
 
 func NewModel() *Model {
 	keys := common.NewAppKeyMap()
@@ -247,6 +262,29 @@ func (m *Model) pollPlayerStateCmd() tea.Cmd {
 		}
 		state, err := m.player.GetPlayerState(context.Background())
 		return playerStateMsg{state: state, err: err}
+	}
+}
+
+func (m *Model) fetchLyricsCmd(track, artist string) tea.Cmd {
+	return func() tea.Msg {
+		svc := corelyrics.GetService()
+		l, err := svc.FetchLyrics(track, artist)
+		return lyricsLoadedMsg{
+			track:  track,
+			artist: artist,
+			lyrics: l,
+			err:    err,
+		}
+	}
+}
+
+func (m *Model) fetchQueueCmd() tea.Cmd {
+	return func() tea.Msg {
+		if m.player == nil {
+			return queueLoadedMsg{err: fmt.Errorf("player not initialized")}
+		}
+		q, err := m.player.GetQueue(context.Background())
+		return queueLoadedMsg{queue: q, err: err}
 	}
 }
 

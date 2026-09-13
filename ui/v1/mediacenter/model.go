@@ -2,17 +2,32 @@ package mediacenter
 
 import (
 	tea "charm.land/bubbletea/v2"
+	corelyrics "cassette/core/lyrics"
 	"cassette/ui/v1/common"
 	"cassette/ui/v1/displayscreen"
+	"cassette/ui/v1/lyrics"
 	"cassette/ui/v1/mediapanel"
 	"cassette/ui/v1/player"
+	"cassette/ui/v1/queue"
+	spotapi "github.com/zmb3/spotify/v2"
+)
+
+type LeftPanelMode int
+
+const (
+	LeftPanelLyrics LeftPanelMode = iota
+	LeftPanelLibrary
+	LeftPanelClosed
 )
 
 type Model struct {
 	mediaPanel    mediapanel.Model
 	player        player.Model
 	displayScreen displayscreen.Model
-	mediaListOpen bool
+	lyricsModel   lyrics.Model
+	queueModel    queue.Model
+	leftPanel     LeftPanelMode
+	queueOpen     bool
 	zenMode       bool
 	keys          common.AppKeyMap
 }
@@ -22,6 +37,10 @@ func NewModel(keys common.AppKeyMap) Model {
 		mediaPanel:    mediapanel.NewModel(keys),
 		player:        player.NewModel(),
 		displayScreen: displayscreen.NewModel(),
+		lyricsModel:   lyrics.NewModel(),
+		queueModel:    queue.NewModel(),
+		leftPanel:     LeftPanelLyrics, // Lyrics on the left by default
+		queueOpen:     true,            // Queue on the right by default
 		keys:          keys,
 	}
 }
@@ -74,13 +93,76 @@ func (m *Model) SetStatus(kind common.ListKind, message string) tea.Cmd {
 	return m.mediaPanel.SetStatus(kind, message)
 }
 
+func (m *Model) SetLyrics(l *corelyrics.Lyrics) {
+	m.lyricsModel.SetLyrics(l)
+}
+
+func (m *Model) SetLyricsPosition(posMs int) {
+	m.lyricsModel.SetPosition(posMs)
+}
+
+func (m *Model) SetLyricsTrack(track, artist string) {
+	m.lyricsModel.SetTrack(track, artist)
+}
+
+func (m *Model) SetLyricsLoading(loading bool) {
+	m.lyricsModel.SetLoading(loading)
+}
+
+func (m *Model) SetQueue(q *spotapi.Queue) {
+	m.queueModel.SetQueue(q)
+}
+
+func (m *Model) LeftPanel() LeftPanelMode {
+	return m.leftPanel
+}
+
+func (m *Model) IsQueueOpen() bool {
+	return m.queueOpen
+}
+
+func (m *Model) ToggleLyrics() {
+	if m.leftPanel == LeftPanelLyrics {
+		m.leftPanel = LeftPanelClosed
+	} else {
+		m.leftPanel = LeftPanelLyrics
+		m.mediaPanel.CloseInfo()
+	}
+}
+
+func (m *Model) ToggleQueue() {
+	m.queueOpen = !m.queueOpen
+}
+
+func (m *Model) SwapLeftPanel() {
+	if m.leftPanel == LeftPanelLyrics {
+		m.leftPanel = LeftPanelLibrary
+	} else if m.leftPanel == LeftPanelLibrary {
+		m.leftPanel = LeftPanelLyrics
+		m.mediaPanel.CloseInfo()
+	} else {
+		m.leftPanel = LeftPanelLibrary
+	}
+}
+
+func (m *Model) ToggleLibrary() {
+	if m.leftPanel == LeftPanelLibrary {
+		m.leftPanel = LeftPanelLyrics
+		m.mediaPanel.CloseInfo()
+	} else {
+		m.leftPanel = LeftPanelLibrary
+	}
+}
+
 func (m *Model) CloseLibrary() {
-	m.mediaListOpen = false
+	if m.leftPanel == LeftPanelLibrary {
+		m.leftPanel = LeftPanelLyrics
+	}
 	m.mediaPanel.CloseInfo()
 }
 
 func (m *Model) IsOpen() bool {
-	return m.mediaListOpen
+	return m.leftPanel == LeftPanelLibrary
 }
 
 func (m *Model) InfoOpen() bool {

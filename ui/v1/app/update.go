@@ -59,6 +59,12 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	centerCmd := m.mediaCenter.Update(msg)
 
+	if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
+		if key.Matches(keyMsg, m.keys.ToggleQueue) && m.mediaCenter.IsQueueOpen() {
+			centerCmd = tea.Batch(centerCmd, m.fetchQueueCmd())
+		}
+	}
+
 	if m.mediaCenter.IsOpen() {
 		return m, centerCmd
 	}
@@ -132,6 +138,7 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 	case ticker.TickFastMsg:
 		m.advancePlayback(180)
 		m.mediaCenter.TickPlayer(m.playing)
+		m.mediaCenter.SetLyricsPosition(m.songInfo.Position)
 		return ticker.DoTickFast(), true
 	case ticker.TickMsg:
 		displayCmd := m.mediaCenter.TickDisplay()
@@ -156,7 +163,7 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		requestCmd := tea.Cmd(func() tea.Msg {
 			return common.RootMediaRequestForListKind(common.Playlists, "")
 		})
-		return tea.Batch(requestCmd, m.pollPlayerStateCmd()), true
+		return tea.Batch(requestCmd, m.pollPlayerStateCmd(), m.fetchQueueCmd()), true
 	case playerStateMsg:
 		if msg.err != nil {
 			if coreplayer.IsNoActiveDeviceError(msg.err) {
@@ -177,26 +184,53 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		if msg.state != nil {
 			m.playerReady = true
 			m.playing = msg.state.CurrentlyPlaying.Playing
+			var extraCmds []tea.Cmd
 			if msg.state.Item != nil {
 				artist := joinArtists(msg.state.Item.Artists)
+				track := msg.state.Item.Name
 				m.songInfo = common.SongInfo{
-					Title:    msg.state.Item.Name,
+					Title:    track,
 					Artist:   artist,
 					Album:    msg.state.Item.Album.Name,
 					Position: int(msg.state.Progress),
 					Duration: int(msg.state.Item.Duration),
 				}
 				m.mediaCenter.SetDisplayFromSong(m.songInfo)
+				m.mediaCenter.SetLyricsPosition(int(msg.state.Progress))
+
+				if track != m.lastLyricsTrack || artist != m.lastLyricsArtist {
+					m.lastLyricsTrack = track
+					m.lastLyricsArtist = artist
+					m.mediaCenter.SetLyricsTrack(track, artist)
+					extraCmds = append(extraCmds, m.fetchLyricsCmd(track, artist), m.fetchQueueCmd())
+				}
 			}
 			if msg.state.Device.Volume > 0 {
 				m.volumeInfo.Volume = int(msg.state.Device.Volume)
 				m.volumeInfo.Max = 100
 			}
 			m.updatePlayerStatus()
+			if len(extraCmds) > 0 {
+				return tea.Batch(extraCmds...), true
+			}
 		} else if m.songInfo.Title != "" {
 			// Spotify returned 204 No Content (paused / idle)
 			m.playing = false
 			m.updatePlayerStatus()
+		}
+		return nil, true
+	case lyricsLoadedMsg:
+		if msg.track == m.lastLyricsTrack && msg.artist == m.lastLyricsArtist {
+			if msg.err == nil && msg.lyrics != nil {
+				m.mediaCenter.SetLyrics(msg.lyrics)
+			} else {
+				m.mediaCenter.SetLyrics(nil)
+			}
+		}
+		return nil, true
+	case queueLoadedMsg:
+		if msg.err == nil && msg.queue != nil {
+			m.mediaCenter.SetQueue(msg.queue)
 		}
 		return nil, true
 	case mediaLoadedMsg:
