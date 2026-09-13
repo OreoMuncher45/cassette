@@ -3,8 +3,8 @@ package auth
 import (
 	"context"
 	"fmt"
-	"github.com/dubeyKartikay/lazyspotify/core/logger"
-	"github.com/dubeyKartikay/lazyspotify/core/utils"
+	"cassette/core/logger"
+	"cassette/core/utils"
 	"github.com/zmb3/spotify/v2"
 	"golang.org/x/oauth2"
 )
@@ -45,7 +45,7 @@ func (a *Authenticator) GetClient(ctx context.Context) (*spotify.Client, error) 
 	if err != nil {
 		return nil, err
 	}
-	return a.authService.GetSpotifyClient(tkn), nil
+	return a.authService.GetSpotifyClient(tkn, a.saveToken), nil
 }
 
 func (a *Authenticator) ReAuthenticate(ctx context.Context, updates chan<- string) (*oauth2.Token, error) {

@@ -53,9 +53,12 @@ func TestGetPlaylistTracksRequestsParsedPlaylistIDAndFiltersUnavailableItems(t *
 	client, cleanup := newTestClient(t, handler)
 	defer cleanup()
 
-	tracks, err := client.GetPlaylistTracks(context.Background(), "spotify:playlist:playlist-id", 20)
+	tracks, total, err := client.GetPlaylistTracks(context.Background(), "spotify:playlist:playlist-id", 20)
 	if err != nil {
 		t.Fatalf("GetPlaylistTracks() error = %v, want nil", err)
+	}
+	if total != 3 {
+		t.Fatalf("total = %d, want 3", total)
 	}
 	if len(tracks) != 2 {
 		t.Fatalf("len(tracks) = %d, want 2", len(tracks))
@@ -75,9 +78,12 @@ func TestGetPlaylistTracksRejectsInvalidURIWithoutCallingAPI(t *testing.T) {
 	client, cleanup := newTestClient(t, handler)
 	defer cleanup()
 
-	tracks, err := client.GetPlaylistTracks(context.Background(), "playlist-id", 0)
+	tracks, total, err := client.GetPlaylistTracks(context.Background(), "playlist-id", 0)
 	if err == nil {
 		t.Fatal("GetPlaylistTracks() error = nil, want invalid URI error")
+	}
+	if total != 0 {
+		t.Fatalf("total = %d, want 0", total)
 	}
 	if tracks != nil {
 		t.Fatalf("tracks = %#v, want nil", tracks)

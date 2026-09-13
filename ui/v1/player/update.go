@@ -2,7 +2,7 @@ package player
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"github.com/dubeyKartikay/lazyspotify/core/ticker"
+	"cassette/core/ticker"
 )
 
 func (m *Model) Update(tea.Msg) tea.Cmd {
@@ -43,6 +43,8 @@ func (m *Model) UpdateStatus(status Status) {
 	s.Volume = status.Volume
 	s.VolumeMax = status.MaxVolume
 	s.Shuffled = status.Shuffled
+	s.TrackName = status.TrackName
+	s.ArtistName = status.ArtistName
 }
 
 func (m *Model) ShowVolume() tea.Cmd {

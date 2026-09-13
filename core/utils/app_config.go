@@ -9,7 +9,7 @@ import (
 	"strings"
 )
 
-const SpotifyClientIDHelpURL = "https://github.com/dubeyKartikay/lazyspotify?tab=readme-ov-file#set-up-your-spotify-client-id"
+const SpotifyClientIDHelpURL = "https://cassette?tab=readme-ov-file#set-up-your-spotify-client-id"
 
 const (
 	appConfigFileName           = "config.yml"
@@ -46,20 +46,10 @@ type AppConfig struct {
 			Key     string `mapstructure:"key"`
 		} `mapstructure:"keyring"`
 	} `mapstructure:"auth"`
-	Librespot struct {
-		Host       string `mapstructure:"host"`
-		Port       int    `mapstructure:"port"`
-		Timeout    int    `mapstructure:"timeout"`
-		RetryDelay int    `mapstructure:"retry-delay"`
-		MaxRetries int    `mapstructure:"max-retries"`
-		SeekStepMs int    `mapstructure:"seek-step-ms"`
-		VolumeStep int    `mapstructure:"volume-step"`
-		Daemon     struct {
-			Cmd             []string `mapstructure:"cmd"`
-			LogLevel        string   `mapstructure:"log_level"`
-			ZeroconfEnabled bool     `mapstructure:"zeroconf_enabled"`
-		} `mapstructure:"daemon"`
-	} `mapstructure:"librespot"`
+	Player struct {
+		SeekStepMs int `mapstructure:"seek-step-ms"`
+		VolumeStep int `mapstructure:"volume-step"`
+	} `mapstructure:"player"`
 }
 
 func (c AppConfig) SpotifyClientID() string {
@@ -73,16 +63,10 @@ func getDefaultAppConfig() AppConfig {
 	cfg.Auth.Port = 8287
 	cfg.Auth.RedirectEndpoint = "/callback"
 	cfg.Auth.Timeout = 30
-	cfg.Auth.Keyring.Service = "spotify"
+	cfg.Auth.Keyring.Service = "cassette"
 	cfg.Auth.Keyring.Key = "token-v2"
-	cfg.Librespot.Host = "127.0.0.1"
-	cfg.Librespot.Port = 4040
-	cfg.Librespot.Timeout = 180
-	cfg.Librespot.RetryDelay = 100
-	cfg.Librespot.MaxRetries = 3
-	cfg.Librespot.SeekStepMs = 5000
-	cfg.Librespot.VolumeStep = 20
-	cfg.Librespot.Daemon.LogLevel = "ERROR"
+	cfg.Player.SeekStepMs = 5000
+	cfg.Player.VolumeStep = 5
 	return cfg
 }
 
@@ -142,6 +126,16 @@ func ensureAppConfigFile() (string, error) {
 		return "", err
 	}
 
+	// Auto-migrate from ~/.config/lazyspotify/config.yml if it exists
+	if dir, err := os.UserConfigDir(); err == nil {
+		oldConfigPath := filepath.Join(dir, "lazyspotify", appConfigFileName)
+		if data, err := os.ReadFile(oldConfigPath); err == nil && len(data) > 0 {
+			if err := os.WriteFile(configPath, data, 0644); err == nil {
+				return configDir, nil
+			}
+		}
+	}
+
 	if err := os.WriteFile(configPath, []byte(defaultAppConfigFileContent), 0644); err != nil {
 		return "", err
 	}
@@ -153,7 +147,7 @@ func getConfigDir() string {
 	if err != nil {
 		return ""
 	}
-	configDir := filepath.Join(dir, "lazyspotify")
+	configDir := filepath.Join(dir, "cassette")
 	return configDir
 }
 
@@ -172,13 +166,6 @@ func applyConfigDefaults(v *viper.Viper) {
 	v.SetDefault("auth.timeout", defaults.Auth.Timeout)
 	v.SetDefault("auth.keyring.service", defaults.Auth.Keyring.Service)
 	v.SetDefault("auth.keyring.key", defaults.Auth.Keyring.Key)
-	v.SetDefault("librespot.host", defaults.Librespot.Host)
-	v.SetDefault("librespot.port", defaults.Librespot.Port)
-	v.SetDefault("librespot.timeout", defaults.Librespot.Timeout)
-	v.SetDefault("librespot.retry-delay", defaults.Librespot.RetryDelay)
-	v.SetDefault("librespot.max-retries", defaults.Librespot.MaxRetries)
-	v.SetDefault("librespot.seek-step-ms", defaults.Librespot.SeekStepMs)
-	v.SetDefault("librespot.volume-step", defaults.Librespot.VolumeStep)
-	v.SetDefault("librespot.daemon.log_level", defaults.Librespot.Daemon.LogLevel)
-	v.SetDefault("librespot.daemon.zeroconf_enabled", defaults.Librespot.Daemon.ZeroconfEnabled)
+	v.SetDefault("player.seek-step-ms", defaults.Player.SeekStepMs)
+	v.SetDefault("player.volume-step", defaults.Player.VolumeStep)
 }

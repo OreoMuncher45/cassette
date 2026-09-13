@@ -5,8 +5,8 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	ansi "github.com/charmbracelet/x/ansi"
-	"github.com/dubeyKartikay/lazyspotify/core/ticker"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
+	"cassette/core/ticker"
+	"cassette/ui/v1/common"
 )
 
 const scrollGap = "   "

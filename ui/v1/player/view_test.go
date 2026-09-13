@@ -10,7 +10,7 @@ func TestViewHidesControlsInZenMode(t *testing.T) {
 
 	view := model.View(true)
 
-	if !strings.Contains(view, "LAZYSPOTIFY") {
+	if !strings.Contains(view, "CASSETTE") {
 		t.Fatalf("view = %q, expected cassette to render in zen mode", view)
 	}
 	for _, icon := range []string{"|<", "<<", "|>", "||", ">>", ">|"} {

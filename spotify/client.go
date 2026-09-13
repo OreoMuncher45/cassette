@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/dubeyKartikay/lazyspotify/core/auth"
-	"github.com/dubeyKartikay/lazyspotify/core/logger"
+	"cassette/core/auth"
+	"cassette/core/logger"
 	"github.com/zalando/go-keyring"
 	"github.com/zmb3/spotify/v2"
 	"golang.org/x/oauth2"
@@ -89,15 +89,22 @@ func (s *SpotifyClient) GetFollowedArtists(ctx context.Context, after string) (*
 	return artists, nil
 }
 
-func (s *SpotifyClient) GetPlaylistTracks(ctx context.Context, uri string, offset int) ([]spotify.FullTrack, error) {
+func (s *SpotifyClient) RawClient() *spotify.Client {
+	if s == nil {
+		return nil
+	}
+	return s.client
+}
+
+func (s *SpotifyClient) GetPlaylistTracks(ctx context.Context, uri string, offset int) ([]spotify.FullTrack, int, error) {
 	id, err := idFromURI(uri)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 	page, err := s.client.GetPlaylistItems(ctx, spotify.ID(id), spotify.Offset(offset), spotify.Limit(10))
 	if err != nil {
 		logger.Log.Error().Err(err).Str("uri", uri).Int("offset", offset).Msg("error getting playlist tracks")
-		return nil, err
+		return nil, 0, err
 	}
 	tracks := make([]spotify.FullTrack, 0, len(page.Items))
 	for _, item := range page.Items {
@@ -106,7 +113,7 @@ func (s *SpotifyClient) GetPlaylistTracks(ctx context.Context, uri string, offse
 		}
 		tracks = append(tracks, *item.Track.Track)
 	}
-	return tracks, nil
+	return tracks, int(page.Total), nil
 }
 
 func (s *SpotifyClient) GetArtistAlbums(ctx context.Context, uri string, offset int) (*spotify.SimpleAlbumPage, error) {

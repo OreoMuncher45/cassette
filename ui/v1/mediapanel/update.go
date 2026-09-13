@@ -5,8 +5,8 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/medialist"
+	"cassette/ui/v1/common"
+	"cassette/ui/v1/medialist"
 )
 
 func (m *Model) Update(msg tea.Msg) tea.Cmd {

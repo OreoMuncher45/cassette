@@ -2,10 +2,10 @@ package mediacenter
 
 import (
 	tea "charm.land/bubbletea/v2"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/displayscreen"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/mediapanel"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/player"
+	"cassette/ui/v1/common"
+	"cassette/ui/v1/displayscreen"
+	"cassette/ui/v1/mediapanel"
+	"cassette/ui/v1/player"
 )
 
 type Model struct {
@@ -87,6 +87,10 @@ func (m *Model) InfoOpen() bool {
 	return m.mediaPanel.InfoOpen()
 }
 
-func (m *Model)IsZenMode() bool {
+func (m *Model) IsZenMode() bool {
 	return m.zenMode
+}
+
+func (m *Model) SearchFocused() bool {
+	return m.mediaPanel.SearchFocused()
 }

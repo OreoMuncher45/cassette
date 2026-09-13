@@ -23,6 +23,8 @@ type Status struct {
 	Volume      int
 	MaxVolume   int
 	Shuffled    bool
+	TrackName   string
+	ArtistName  string
 }
 
 type Model struct {

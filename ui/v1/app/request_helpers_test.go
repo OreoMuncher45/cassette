@@ -4,8 +4,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/dubeyKartikay/lazyspotify/librespot/models"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
+	"cassette/ui/v1/common"
 	spotifyapi "github.com/zmb3/spotify/v2"
 )
 
@@ -128,98 +127,74 @@ func TestAdaptSpotifySavedTracksBuildsUserFacingEntity(t *testing.T) {
 	}
 }
 
-func TestAdaptResolvedPlaylistTracksBuildsDescriptionsWithoutDanglingSeparators(t *testing.T) {
-	tracks := []models.ResolvedTrack{
+func TestAdaptSpotifyTracksBuildsUserFacingEntity(t *testing.T) {
+	tracks := []spotifyapi.FullTrack{
 		{
-			Name:      "Track With Artists And Album",
-			URI:       "spotify:track:both",
-			Artists:   []string{"Artist One", "Artist Two"},
-			AlbumName: "Album",
-			Img:       "https://images.spotify.test/track.jpg",
-		},
-		{
-			Name:      "Album Only Track",
-			URI:       "spotify:track:album-only",
-			AlbumName: "Album Only",
-		},
-		{
-			Name:    "Artists Only Track",
-			URI:     "spotify:track:artists-only",
-			Artists: []string{"Artist"},
+			SimpleTrack: spotifyapi.SimpleTrack{
+				Name: "Track One",
+				URI:  "spotify:track:one",
+				Artists: []spotifyapi.SimpleArtist{
+					{Name: "Artist A"},
+				},
+			},
+			Album: spotifyapi.SimpleAlbum{
+				Name:   "Album X",
+				Images: []spotifyapi.Image{{URL: "https://images.spotify.test/one.jpg"}},
+			},
 		},
 	}
 
-	entities := adaptResolvedPlaylistTracks(tracks)
-	if len(entities) != 3 {
-		t.Fatalf("len(entities) = %d, want 3", len(entities))
+	entities := adaptSpotifyTracks(tracks)
+	if len(entities) != 1 {
+		t.Fatalf("len(entities) = %d, want 1", len(entities))
 	}
-	assertEntity(t, entities[0], common.NewEntity("Track With Artists And Album", "Artist One, Artist Two • Album", "spotify:track:both", "https://images.spotify.test/track.jpg"))
-	assertEntity(t, entities[1], common.NewEntity("Album Only Track", "Album Only", "spotify:track:album-only", ""))
-	assertEntity(t, entities[2], common.NewEntity("Artists Only Track", "Artist", "spotify:track:artists-only", ""))
+	want := common.NewEntity("Track One", "Artist A • Album X", "spotify:track:one", "https://images.spotify.test/one.jpg")
+	if entities[0] != want {
+		t.Fatalf("entity = %#v, want %#v", entities[0], want)
+	}
 }
 
-func TestApplyPlayerEventUpdatesPlaybackState(t *testing.T) {
+func TestPlayerStateMsgUpdatesPlaybackState(t *testing.T) {
 	model := NewModel()
-	model.playing = true
-	model.volumeInfo = common.VolumeInfo{Volume: 1000, Max: 65535}
+	model.playerReady = true
 
-	model.applyPlayerEvent(models.PlayerEvent{
-		Type: models.EventTypeMetadata,
-		Metadata: &models.MetadataEventData{
-			Name:        "Track",
-			ArtistNames: []string{"Artist One", "Artist Two"},
-			AlbumName:   "Album",
-			Position:    42000,
-			Duration:    180000,
+	msg := playerStateMsg{
+		state: &spotifyapi.PlayerState{
+			CurrentlyPlaying: spotifyapi.CurrentlyPlaying{
+				Playing:  true,
+				Progress: 42000,
+				Item: &spotifyapi.FullTrack{
+					SimpleTrack: spotifyapi.SimpleTrack{
+						Name: "Test Track",
+						Artists: []spotifyapi.SimpleArtist{
+							{Name: "Test Artist"},
+						},
+						Duration: 180000,
+					},
+					Album: spotifyapi.SimpleAlbum{Name: "Test Album"},
+				},
+			},
+			Device: spotifyapi.PlayerDevice{
+				ID:     "dev-1",
+				Name:   "Speaker",
+				Volume: 80,
+			},
+			ShuffleState: true,
 		},
-	})
-	wantSong := common.SongInfo{
-		Title:    "Track",
-		Artist:   "Artist One, Artist Two",
-		Album:    "Album",
-		Position: 42000,
-		Duration: 180000,
-	}
-	if model.songInfo != wantSong {
-		t.Fatalf("songInfo = %#v, want %#v", model.songInfo, wantSong)
 	}
 
-	model.applyPlayerEvent(models.PlayerEvent{
-		Type: models.EventTypeSeek,
-		Seek: &models.SeekEventData{Position: 60000, Duration: 181000},
-	})
-	if model.songInfo.Position != 60000 || model.songInfo.Duration != 181000 {
-		t.Fatalf("seek-updated songInfo = %#v, want position 60000 duration 181000", model.songInfo)
-	}
+	model.Update(msg)
 
-	model.applyPlayerEvent(models.PlayerEvent{
-		Type:   models.EventTypeVolume,
-		Volume: &models.VolumeEventData{Value: 2000, Max: 0},
-	})
-	if model.volumeInfo.Volume != 2000 || model.volumeInfo.Max != 65535 {
-		t.Fatalf("volumeInfo after max=0 event = %#v, want value 2000 and previous max 65535", model.volumeInfo)
+	if !model.playing {
+		t.Fatal("playing = false, want true")
 	}
-
-	model.applyPlayerEvent(models.PlayerEvent{
-		Type:   models.EventTypeVolume,
-		Volume: &models.VolumeEventData{Value: 50, Max: 100},
-	})
-	if model.volumeInfo.Volume != 50 || model.volumeInfo.Max != 100 {
-		t.Fatalf("volumeInfo after max=100 event = %#v, want 50/100", model.volumeInfo)
+	if model.songInfo.Title != "Test Track" {
+		t.Fatalf("song title = %q, want Test Track", model.songInfo.Title)
 	}
-
-	model.applyPlayerEvent(models.PlayerEvent{Type: models.EventTypeStopped})
-	if model.playing {
-		t.Fatal("playing = true after stopped event, want false")
+	if model.songInfo.Position != 42000 {
+		t.Fatalf("song position = %d, want 42000", model.songInfo.Position)
 	}
-	if model.songInfo.Position != 0 {
-		t.Fatalf("songInfo.Position after stopped event = %d, want 0", model.songInfo.Position)
-	}
-}
-
-func assertEntity(t *testing.T, got common.Entity, want common.Entity) {
-	t.Helper()
-	if got != want {
-		t.Fatalf("entity = %#v, want %#v", got, want)
+	if model.volumeInfo.Volume != 80 {
+		t.Fatalf("volume = %d, want 80", model.volumeInfo.Volume)
 	}
 }

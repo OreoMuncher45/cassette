@@ -7,8 +7,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/dubeyKartikay/lazyspotify/core/logger"
-	"github.com/dubeyKartikay/lazyspotify/core/utils"
+	"cassette/core/logger"
+	"cassette/core/utils"
 )
 
 type AuthServerErr struct {
@@ -25,7 +25,6 @@ type AuthServer struct {
 	httpServer       *http.Server
 	Started          atomic.Bool
 }
-
 
 func NewAuthServer() *AuthServer {
 	cfg := utils.GetConfig().Auth
@@ -50,9 +49,9 @@ func (authServer *AuthServer) Start() chan error {
 }
 
 func (authServer *AuthServer) Shutdown() error {
-	if(!authServer.Started.Load()) {
-    return nil
-  }
+	if !authServer.Started.Load() {
+		return nil
+	}
 	authServer.Started.Store(false)
 	ctx, cancel := context.WithTimeout(context.Background(), authServer.timeout)
 	defer cancel()
@@ -83,8 +82,8 @@ func registerRoutes(mux *http.ServeMux, redirectEndpoint string, oauthRedirectCa
 }
 
 func startServer(authServer *AuthServer) chan error {
-	if(authServer.Started.Load()) {
-  	return nil
+	if authServer.Started.Load() {
+		return nil
 	}
 	errCh := make(chan error, 1)
 	authServer.Started.Store(true)

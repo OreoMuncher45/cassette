@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/medialist"
+	"cassette/ui/v1/common"
+	"cassette/ui/v1/medialist"
 )
 
 func TestApplySearchResetsPanelsToRoot(t *testing.T) {

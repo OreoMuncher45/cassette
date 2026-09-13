@@ -4,7 +4,7 @@ import (
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/paginator"
 	"charm.land/lipgloss/v2"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
+	"cassette/ui/v1/common"
 )
 
 type State int

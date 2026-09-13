@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	ansi "github.com/charmbracelet/x/ansi"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
+	"cassette/ui/v1/common"
 )
 
 func TestScrollTextDoesNotGoBlankAcrossTicks(t *testing.T) {

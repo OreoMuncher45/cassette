@@ -20,6 +20,9 @@ func (m *Model) View() tea.View {
 	if m.authModel != nil && m.authModel.State() < 2 {
 		return m.authModel.View()
 	}
+	if m.devicePickerOpen && m.devicesModel != nil {
+		return m.devicesModel.View()
+	}
 
 	mediaCenterView := m.mediaCenter.View(m.width, m.height)
 	helpKeys := m.keys.WithMediaPanelOpen(m.mediaCenter.IsOpen()).WithInfoOpen(m.mediaCenter.InfoOpen())
@@ -31,8 +34,8 @@ func (m *Model) View() tea.View {
 	layers := []*lipgloss.Layer{
 		lipgloss.NewLayer(modelView).ID("model"),
 	}
-	if(!m.mediaCenter.IsZenMode()){
-		layers = append(layers,lipgloss.NewLayer(helpLine).Y(m.height - lipgloss.Height(helpLine)).ID("help"))
+	if !m.mediaCenter.IsZenMode() {
+		layers = append(layers, lipgloss.NewLayer(helpLine).Y(m.height-lipgloss.Height(helpLine)).ID("help"))
 	}
 	return tea.NewView(lipgloss.NewCompositor(layers...).Render())
 }

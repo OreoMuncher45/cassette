@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
+	"cassette/ui/v1/common"
 )
 
 func TestViewHidesPlayerWhenPanelIsOpenAndViewportIsTooSmall(t *testing.T) {
@@ -15,7 +15,7 @@ func TestViewHidesPlayerWhenPanelIsOpenAndViewportIsTooSmall(t *testing.T) {
 
 	view := model.View(40, 24)
 
-	if strings.Contains(view, "LAZYSPOTIFY") {
+	if strings.Contains(view, "CASSETTE") {
 		t.Fatalf("view = %q, did not expect player to render in narrow viewport", view)
 	}
 }
@@ -27,7 +27,7 @@ func TestViewKeepsPlayerWhenPanelIsOpenAndViewportFits(t *testing.T) {
 
 	view := model.View(120, 40)
 
-	if !strings.Contains(view, "LAZYSPOTIFY") {
+	if !strings.Contains(view, "CASSETTE") {
 		t.Fatalf("view = %q, expected player to render in wide viewport", view)
 	}
 }
@@ -40,7 +40,7 @@ func TestViewShowsPlayerAgainAfterClosingLibrary(t *testing.T) {
 
 	view := model.View(120, 40)
 
-	if !strings.Contains(view, "LAZYSPOTIFY") {
+	if !strings.Contains(view, "CASSETTE") {
 		t.Fatalf("view = %q, expected player to render after closing library", view)
 	}
 }
@@ -50,7 +50,7 @@ func TestViewDoesNotHidePlayerWhenViewportIsTooSmallAndPanelIsClosed(t *testing.
 
 	view := model.View(1, 1)
 
-	if !strings.Contains(view, "LAZYSPOTIFY") {
+	if !strings.Contains(view, "CASSETTE") {
 		t.Fatalf("view = %q, expected player to remain rendered when panel is closed", view)
 	}
 }
@@ -62,10 +62,10 @@ func TestViewHidesDisplayAndControlsInZenMode(t *testing.T) {
 
 	view := model.View(120, 40)
 
-	if !strings.Contains(view, "LAZYSPOTIFY") {
+	if !strings.Contains(view, "CASSETTE") {
 		t.Fatalf("view = %q, expected cassette to remain visible in zen mode", view)
 	}
-	if strings.Contains(view, "Lazyspotify: The cutest terminal music player") {
+	if strings.Contains(view, "Cassette: The retro terminal Spotify player") {
 		t.Fatalf("view = %q, did not expect display screen content in zen mode", view)
 	}
 	for _, icon := range []string{"|<", "<<", "|>", "||", ">>", ">|"} {

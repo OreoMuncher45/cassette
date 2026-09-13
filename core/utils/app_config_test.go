@@ -65,16 +65,13 @@ func TestGetDefaultAppConfigUsesErrorLogLevels(t *testing.T) {
 	if got := cfg.LogLevel; got != "ERROR" {
 		t.Fatalf("getDefaultAppConfig().LogLevel = %q, want %q", got, "ERROR")
 	}
-	if got := cfg.Librespot.Daemon.LogLevel; got != "ERROR" {
-		t.Fatalf("getDefaultAppConfig().Librespot.Daemon.LogLevel = %q, want %q", got, "ERROR")
-	}
 }
 
 func TestGetDefaultAppConfigVolumeStepIsPercentage(t *testing.T) {
 	cfg := getDefaultAppConfig()
 
-	if got := cfg.Librespot.VolumeStep; got != 20 {
-		t.Fatalf("getDefaultAppConfig().Librespot.VolumeStep = %d, want 20", got)
+	if got := cfg.Player.VolumeStep; got != 5 {
+		t.Fatalf("getDefaultAppConfig().Player.VolumeStep = %d, want 5", got)
 	}
 }
 

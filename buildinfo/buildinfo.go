@@ -6,19 +6,17 @@ import (
 )
 
 var (
-	Version            = "dev"
-	Commit             = "unknown"
-	BuildDate          = "unknown"
-	PackagedDaemonPath = ""
+	Version   = "dev"
+	Commit    = "unknown"
+	BuildDate = "unknown"
 )
 
 func Text() string {
 	return fmt.Sprintf(
-		"version=%s\ncommit=%s\nbuild_date=%s\npackaged_daemon_path=%s\n",
+		"version=%s\ncommit=%s\nbuild_date=%s\n",
 		Version,
 		Commit,
 		BuildDate,
-		PackagedDaemonPath,
 	)
 }
 

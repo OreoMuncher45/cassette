@@ -1,8 +1,8 @@
 package v1
 
 import (
-	"github.com/dubeyKartikay/lazyspotify/core/logger"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/app"
+	"cassette/core/logger"
+	"cassette/ui/v1/app"
 )
 
 func RunTui() {

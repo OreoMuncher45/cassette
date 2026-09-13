@@ -5,9 +5,8 @@ import (
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
-	"github.com/dubeyKartikay/lazyspotify/core/logger"
-	"github.com/dubeyKartikay/lazyspotify/librespot/models"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
+	"cassette/core/logger"
+	"cassette/ui/v1/common"
 	"github.com/zmb3/spotify/v2"
 )
 
@@ -143,28 +142,18 @@ func (m *Model) handleSearchArtists(request common.MediaRequest) tea.Cmd {
 }
 
 func (m *Model) handleGetPlaylistTracks(request common.MediaRequest) tea.Cmd {
-	if m.player == nil {
+	if m.spotifyClient == nil {
 		return nil
 	}
 	return func() tea.Msg {
 		const pageSize = 10
 		offset := decodeOffsetCursor(request.Cursor)
-		resp, err := m.player.GetPlaylistTracks(context.Background(), request.EntityURI, offset, pageSize)
+		tracks, total, err := m.spotifyClient.GetPlaylistTracks(context.Background(), request.EntityURI, offset)
 		if err != nil {
 			return mediaLoadErrMsg{err: err, request: request}
 		}
-		entities := adaptResolvedPlaylistTracks(resp.Tracks)
-		nextCursor := ""
-		if resp.HasNext {
-			nextCursor = encodeOffsetCursor(offset + pageSize)
-		}
-		pagination := common.PaginationInfo{
-			CurrentPage: request.Page,
-			TotalPages:  totalPages(resp.Total, pageSize),
-			TotalItems:  resp.Total,
-			HasNext:     resp.HasNext,
-			NextCursor:  nextCursor,
-		}
+		entities := adaptSpotifyTracks(tracks)
+		pagination := paginationFromOffset(offset, len(entities), total, pageSize)
 		return mediaLoadedMsg{entities: entities, kind: common.Tracks, pagination: pagination, request: request}
 	}
 }
@@ -206,9 +195,7 @@ func (m *Model) handlePlayTrackRequest(request common.MediaRequest) tea.Cmd {
 	if m.player == nil {
 		return m.mediaCenter.SetStatus(request.PanelKind, "Player not ready")
 	}
-	m.mediaCenter.SetDisplay("Loading...")
-	m.playerReady = false
-	m.playing = false
+	m.mediaCenter.SetDisplay("Loading track...")
 	m.mediaCenter.CloseLibrary()
 	return func() tea.Msg {
 		err := m.player.PlayTrack(context.Background(), request.EntityURI, request.ContextURI)
@@ -273,20 +260,6 @@ func adaptSpotifyTracks(tracks []spotify.FullTrack) []common.Entity {
 			}
 		}
 		return common.NewEntity(track.Name, desc, string(track.URI), imageURL(track.Album.Images))
-	})
-}
-
-func adaptResolvedPlaylistTracks(tracks []models.ResolvedTrack) []common.Entity {
-	return common.MapSlice(tracks, func(track models.ResolvedTrack) common.Entity {
-		desc := strings.TrimSpace(strings.Join(track.Artists, ", "))
-		if track.AlbumName != "" {
-			if desc != "" {
-				desc += " • " + track.AlbumName
-			} else {
-				desc = track.AlbumName
-			}
-		}
-		return common.NewEntity(track.Name, desc, track.URI, track.Img)
 	})
 }
 

@@ -6,8 +6,8 @@ import (
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
-	coreauth "github.com/dubeyKartikay/lazyspotify/core/auth"
-	"github.com/dubeyKartikay/lazyspotify/core/utils"
+	coreauth "cassette/core/auth"
+	"cassette/core/utils"
 )
 
 type authQuitMsg struct{}

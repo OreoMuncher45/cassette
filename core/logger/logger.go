@@ -3,7 +3,7 @@ package logger
 import (
 	"strings"
 
-	"github.com/dubeyKartikay/lazyspotify/core/utils"
+	"cassette/core/utils"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/pkgerrors"
 )
@@ -11,7 +11,7 @@ import (
 var Log zerolog.Logger
 
 func init() {
-	lumberjackLogger := utils.NewLumberjackLogger("lazyspotify.log")
+	lumberjackLogger := utils.NewLumberjackLogger("cassette.log")
 	zerolog.ErrorStackMarshaler = pkgerrors.MarshalStack
 	level, invalidLevel := appLogLevel(utils.GetConfig().LogLevel)
 	Log = zerolog.New(lumberjackLogger).Level(level).With().Timestamp().Caller().Stack().Logger()

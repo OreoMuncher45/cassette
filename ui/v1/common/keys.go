@@ -27,6 +27,7 @@ type AppKeyMap struct {
 	VolumeUp       key.Binding
 	Shuffle        key.Binding
 	ZenMode        key.Binding
+	Devices        key.Binding
 	MediaPanelOpen bool
 	InfoOpen       bool
 }
@@ -82,36 +83,36 @@ func NewAppKeyMap() AppKeyMap {
 			key.WithHelp("left/h/[", "prev page"),
 		),
 		TogglePanel: key.NewBinding(
-			key.WithKeys("P"),
-			key.WithHelp("P", "toggle panel"),
+			key.WithKeys("P", "tab"),
+			key.WithHelp("P/tab", "library"),
 		),
 		PlayPause: key.NewBinding(
-			key.WithKeys(" ", "space", "p"),
-			key.WithHelp("space/p", "play pause"),
+			key.WithKeys(" ", "space"),
+			key.WithHelp("space", "play/pause"),
 		),
 		SeekForward: key.NewBinding(
-			key.WithKeys("right", "l", "ctrl+f", "]"),
-			key.WithHelp("right/l/]", "seek +"),
+			key.WithKeys(">", ".", "right", "l", "]"),
+			key.WithHelp(">", "seek +"),
 		),
 		SeekBackward: key.NewBinding(
-			key.WithKeys("left", "h", "ctrl+b", "["),
-			key.WithHelp("left/h/[", "seek -"),
+			key.WithKeys("<", ",", "left", "h", "["),
+			key.WithHelp("<", "seek -"),
 		),
 		NextTrack: key.NewBinding(
 			key.WithKeys("n", "ctrl+s"),
 			key.WithHelp("n", "next"),
 		),
 		PrevTrack: key.NewBinding(
-			key.WithKeys("N", "ctrl+r"),
-			key.WithHelp("N", "previous"),
+			key.WithKeys("p", "N", "ctrl+r"),
+			key.WithHelp("p", "prev"),
 		),
 		VolumeDown: key.NewBinding(
-			key.WithKeys("j", "ctrl+p"),
-			key.WithHelp("j", "volume -"),
+			key.WithKeys("-", "_", "j", "ctrl+p"),
+			key.WithHelp("-", "vol -"),
 		),
 		VolumeUp: key.NewBinding(
-			key.WithKeys("k", "ctrl+n"),
-			key.WithHelp("k", "volume +"),
+			key.WithKeys("+", "=", "k", "ctrl+n"),
+			key.WithHelp("+", "vol +"),
 		),
 		Shuffle: key.NewBinding(
 			key.WithKeys("s"),
@@ -121,17 +122,23 @@ func NewAppKeyMap() AppKeyMap {
 			key.WithKeys("z"),
 			key.WithHelp("z", "zen mode"),
 		),
+		Devices: key.NewBinding(
+			key.WithKeys("d"),
+			key.WithHelp("d", "devices"),
+		),
 	}
 }
 
 func (k AppKeyMap) ShortHelp() []key.Binding {
-	bindings := []key.Binding{k.ToggleHelp, k.Quit, k.TogglePanel}
-	return bindings
+	if k.MediaPanelOpen {
+		return []key.Binding{k.TogglePanel, k.Select, k.Search, k.Back, k.PlayPause, k.Devices, k.Quit}
+	}
+	return []key.Binding{k.PlayPause, k.NextTrack, k.PrevTrack, k.VolumeUp, k.VolumeDown, k.SeekForward, k.Shuffle, k.TogglePanel, k.Devices, k.Quit}
 }
 
 func (k AppKeyMap) FullHelp() [][]key.Binding {
 	help := [][]key.Binding{
-		{k.ToggleHelp, k.Quit, k.TogglePanel},
+		{k.ToggleHelp, k.Quit, k.TogglePanel, k.Devices},
 	}
 	if k.MediaPanelOpen {
 		if k.InfoOpen {
@@ -152,7 +159,7 @@ func (k AppKeyMap) FullHelp() [][]key.Binding {
 	}
 	return append(help,
 		[]key.Binding{k.PlayPause, k.SeekForward, k.SeekBackward},
-		[]key.Binding{k.VolumeDown, k.VolumeUp, k.NextTrack, k.PrevTrack, k.Shuffle},
+		[]key.Binding{k.VolumeDown, k.VolumeUp, k.NextTrack, k.PrevTrack, k.Shuffle, k.Devices},
 	)
 }
 

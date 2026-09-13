@@ -5,27 +5,28 @@ import (
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/help"
 	tea "charm.land/bubbletea/v2"
-	uiauth "github.com/dubeyKartikay/lazyspotify/ui/v1/auth"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/mediacenter"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/player"
-
-	"github.com/dubeyKartikay/lazyspotify/core/auth"
-	"github.com/dubeyKartikay/lazyspotify/core/logger"
-	coreplayer "github.com/dubeyKartikay/lazyspotify/core/player"
-	"github.com/dubeyKartikay/lazyspotify/core/ticker"
-	"github.com/dubeyKartikay/lazyspotify/core/utils"
-	"github.com/dubeyKartikay/lazyspotify/librespot/models"
-	"github.com/dubeyKartikay/lazyspotify/spotify"
+	"cassette/core/auth"
+	"cassette/core/logger"
+	coreplayer "cassette/core/player"
+	"cassette/core/ticker"
+	"cassette/core/utils"
+	"cassette/spotify"
+	uiauth "cassette/ui/v1/auth"
+	"cassette/ui/v1/common"
+	"cassette/ui/v1/devices"
+	"cassette/ui/v1/mediacenter"
+	"cassette/ui/v1/player"
+	spotapi "github.com/zmb3/spotify/v2"
 )
 
 type Model struct {
 	authModel          *uiauth.Model
+	devicesModel       *devices.Model
+	devicePickerOpen   bool
 	playing            bool
 	playerReady        bool
 	songInfo           common.SongInfo
@@ -33,6 +34,7 @@ type Model struct {
 	volumeOverlayUntil time.Time
 	fatalErr           error
 	player             *coreplayer.Player
+	localDaemon        *coreplayer.LocalDaemon
 	spotifyClient      *spotify.SpotifyClient
 	mediaCenter        mediacenter.Model
 	width              int
@@ -62,22 +64,13 @@ type playTrackErrMsg struct {
 type playTrackOkMsg struct {
 	panelKind common.ListKind
 }
+
 type startupCompleteMsg struct{}
-type playerReadyMsg struct{}
 
-type playerReadyErrMsg struct {
-	err error
+type playerStateMsg struct {
+	state *spotapi.PlayerState
+	err   error
 }
-
-type daemonRestartErrMsg struct {
-	err error
-}
-
-type playerEventMsg struct {
-	event models.PlayerEvent
-}
-
-type playerEventsClosedMsg struct{}
 
 type playPauseOkMsg struct {
 	playing bool
@@ -103,10 +96,12 @@ type fatalQuitMsg struct{}
 func NewModel() *Model {
 	keys := common.NewAppKeyMap()
 	model := &Model{
-		authModel:   uiauth.NewModel(),
-		mediaCenter: mediacenter.NewModel(keys),
-		help:        newHelpModel(),
-		keys:        keys,
+		authModel:    uiauth.NewModel(),
+		devicesModel: devices.NewModel(false),
+		mediaCenter:  mediacenter.NewModel(keys),
+		help:         newHelpModel(),
+		keys:         keys,
+		volumeInfo:   common.VolumeInfo{Volume: 50, Max: 100},
 	}
 	model.requestHandlers = map[common.MediaRequestKind]func(common.MediaRequest) tea.Cmd{
 		common.GetUserPlaylists:   model.handleGetUserPlaylists,
@@ -159,13 +154,15 @@ func (m *Model) setSize(width, height int) {
 	if m.authModel != nil {
 		m.authModel.SetSize(width, height)
 	}
+	if m.devicesModel != nil {
+		m.devicesModel.SetSize(width, height)
+	}
 }
 
 func (m *Model) shutdown() {
-	if m.player == nil {
-		return
+	if m.localDaemon != nil {
+		m.localDaemon.Stop()
 	}
-	m.player.Destroy(context.Background())
 }
 
 func (m *Model) start() error {
@@ -174,6 +171,7 @@ func (m *Model) start() error {
 	m.authModel = uiauth.NewModel()
 	if m.width != 0 || m.height != 0 {
 		m.authModel.SetSize(m.width, m.height)
+		m.devicesModel.SetSize(m.width, m.height)
 	}
 
 	m.spotifyClient, err = spotify.NewSpotifyClient(ctx, m.authModel.Authenticator())
@@ -200,59 +198,55 @@ func (m *Model) start() error {
 		return err
 	}
 
-	m.player, err = coreplayer.NewPlayer(ctx, userID, token.AccessToken)
+	m.player = coreplayer.NewPlayer(m.spotifyClient.RawClient(), "", "")
+
+	// Fetch initial devices
+	devs, err := m.player.GetDevices(ctx)
 	if err != nil {
-		logger.Log.Error().Err(err).Msg("failed to create player")
-		return err
+		logger.Log.Warn().Err(err).Msg("failed to get player devices on startup")
+		if spotify.IsAuthError(err) {
+			m.authModel.SetState(uiauth.NeedsAuth)
+			return err
+		}
 	}
-	if err := m.player.Start(ctx); err != nil {
-		logger.Log.Error().Err(err).Msg("failed to start player")
-		m.player = nil
-		return fmt.Errorf("failed to start librespot daemon: %w", err)
+
+	m.localDaemon = coreplayer.StartLocalDaemon()
+	m.devicesModel.SetDevices(devs)
+	// If a device is already active or local device exists, don't force picker open
+	hasActive := false
+	for _, d := range devs {
+		if d.Active {
+			hasActive = true
+			break
+		}
 	}
+	if !hasActive && len(devs) > 0 {
+		m.devicePickerOpen = true
+	}
+
 	return nil
 }
 
-func (m *Model) waitForPlayerReady() tea.Cmd {
-	if m.player == nil {
-		return nil
-	}
+func (m *Model) fetchDevicesCmd() tea.Cmd {
 	return func() tea.Msg {
-		err := m.player.WaitTillReady()
-		if err != nil {
-			return playerReadyErrMsg{err: err}
+		if m.player == nil {
+			return devices.DevicesLoadedMsg{Devices: nil, Err: fmt.Errorf("player not initialized")}
 		}
-		return playerReadyMsg{}
+		devs, err := m.player.GetDevices(context.Background())
+		return devices.DevicesLoadedMsg{Devices: devs, Err: err}
 	}
 }
 
-func (m *Model) waitForPlayerEvent() tea.Cmd {
-	if m.player == nil {
-		return nil
-	}
-	events := m.player.Events()
-	if events == nil {
-		return nil
-	}
+func (m *Model) pollPlayerStateCmd() tea.Cmd {
 	return func() tea.Msg {
-		ev, ok := <-events
-		if !ok {
-			return playerEventsClosedMsg{}
+		if m.player == nil {
+			return playerStateMsg{state: nil, err: fmt.Errorf("player not initialized")}
 		}
-		return playerEventMsg{event: ev}
-	}
-}
-
-func (m *Model) waitForDaemonRestartFailure() tea.Cmd {
-	if m.player == nil {
-		return nil
-	}
-	return func() tea.Msg {
-		err := m.player.WaitForDaemonFailure()
-		if err != nil {
-			return daemonRestartErrMsg{err: err}
+		if m.player.GetDeviceID() == "" {
+			_, _ = m.player.AutoSelectLocalDevice(context.Background())
 		}
-		return nil
+		state, err := m.player.GetPlayerState(context.Background())
+		return playerStateMsg{state: state, err: err}
 	}
 }
 
@@ -276,47 +270,17 @@ func (m *Model) showActionError(action string, err error) {
 	if err == nil {
 		return
 	}
+	if coreplayer.IsNoActiveDeviceError(err) {
+		m.mediaCenter.SetDisplay("No Active Device Found")
+		m.playerReady = false
+		m.playing = false
+		m.updatePlayerStatus()
+		return
+	}
 	if action == "" {
 		action = "Error"
 	}
 	m.mediaCenter.SetDisplay(fmt.Sprintf("%s: %v", action, err))
-}
-
-func (m *Model) applyPlayerEvent(ev models.PlayerEvent) {
-	switch ev.Type {
-	case models.EventTypeMetadata:
-		if ev.Metadata == nil {
-			return
-		}
-		artist := strings.Join(ev.Metadata.ArtistNames, ", ")
-		m.songInfo = common.SongInfo{
-			Title:    ev.Metadata.Name,
-			Artist:   artist,
-			Album:    ev.Metadata.AlbumName,
-			Position: ev.Metadata.Position,
-			Duration: ev.Metadata.Duration,
-		}
-		m.mediaCenter.SetDisplayFromSong(m.songInfo)
-	case models.EventTypePlaying:
-		m.playing = true
-	case models.EventTypePaused, models.EventTypeStopped:
-		m.playing = false
-		if ev.Type == models.EventTypeStopped {
-			m.songInfo.Position = 0
-		}
-	case models.EventTypeSeek:
-		if ev.Seek != nil {
-			m.songInfo.Position = ev.Seek.Position
-			m.songInfo.Duration = ev.Seek.Duration
-		}
-	case models.EventTypeVolume:
-		if ev.Volume != nil {
-			m.volumeInfo.Volume = ev.Volume.Value
-			if ev.Volume.Max > 0 {
-				m.volumeInfo.Max = ev.Volume.Max
-			}
-		}
-	}
 }
 
 func (m *Model) markVolumeOverlay() {
@@ -344,6 +308,10 @@ func (m *Model) updatePlayerStatus() {
 	if maxVolume <= 0 {
 		maxVolume = 100
 	}
+	shuffled := false
+	if m.player != nil {
+		shuffled = m.player.Shuffled()
+	}
 	m.mediaCenter.UpdatePlayerStatus(player.Status{
 		PlayerReady: m.playerReady,
 		Playing:     m.playing,
@@ -351,7 +319,9 @@ func (m *Model) updatePlayerStatus() {
 		Duration:    m.songInfo.Duration,
 		Volume:      m.volumeInfo.Volume,
 		MaxVolume:   maxVolume,
-		Shuffled:    m.player.Shuffled(),
+		Shuffled:    shuffled,
+		TrackName:   m.songInfo.Title,
+		ArtistName:  m.songInfo.Artist,
 	})
 }
 
@@ -359,23 +329,29 @@ func (m *Model) playPause() error {
 	if m.player == nil {
 		return fmt.Errorf("player not ready")
 	}
-	return m.player.PlayPause(context.Background())
+	return m.player.PlayPause(context.Background(), m.playing)
 }
 
 func (m *Model) seekForward() error {
 	if m.player == nil {
 		return fmt.Errorf("player not ready")
 	}
-	step := utils.GetConfig().Librespot.SeekStepMs
-	return m.player.Seek(context.Background(), step, true)
+	step := utils.GetConfig().Player.SeekStepMs
+	if step <= 0 {
+		step = 5000
+	}
+	return m.player.Seek(context.Background(), step, true, m.songInfo.Position)
 }
 
 func (m *Model) seekBackward() error {
 	if m.player == nil {
 		return fmt.Errorf("player not ready")
 	}
-	step := utils.GetConfig().Librespot.SeekStepMs
-	return m.player.Seek(context.Background(), -step, true)
+	step := utils.GetConfig().Player.SeekStepMs
+	if step <= 0 {
+		step = 5000
+	}
+	return m.player.Seek(context.Background(), -step, true, m.songInfo.Position)
 }
 
 func (m *Model) next() error {
@@ -404,25 +380,11 @@ func (m *Model) changeVolume(deltaPercent int) (common.VolumeInfo, error) {
 		return common.VolumeInfo{}, fmt.Errorf("player not ready")
 	}
 
-	volume, err := m.player.GetVolume(context.Background())
-	if err != nil {
+	target := max(0, min(100, m.volumeInfo.Volume+deltaPercent))
+	if err := m.player.SetVolume(context.Background(), target); err != nil {
 		return common.VolumeInfo{}, err
 	}
-
-	maxVolume := volume.Max
-	if maxVolume <= 0 {
-		maxVolume = m.volumeInfo.Max
-	}
-	if maxVolume <= 0 {
-		maxVolume = 65535
-	}
-
-	delta := calcVolumeDelta(maxVolume, deltaPercent)
-	target := max(0, min(maxVolume, volume.Value+delta))
-	if err := m.player.SetVolume(context.Background(), target, false); err != nil {
-		return common.VolumeInfo{}, err
-	}
-	return common.VolumeInfo{Volume: target, Max: maxVolume}, nil
+	return common.VolumeInfo{Volume: target, Max: 100}, nil
 }
 
 func (m *Model) playPauseCmd() tea.Cmd {
@@ -472,7 +434,10 @@ func (m *Model) previousCmd() tea.Cmd {
 }
 
 func (m *Model) shuffleCmd() tea.Cmd {
-	targetShuffle := !m.player.Shuffled()
+	targetShuffle := true
+	if m.player != nil {
+		targetShuffle = !m.player.Shuffled()
+	}
 	return func() tea.Msg {
 		if err := m.shuffle(targetShuffle); err != nil {
 			return transportErrMsg{err: err, action: "Failed to toggle shuffle"}
@@ -483,7 +448,11 @@ func (m *Model) shuffleCmd() tea.Cmd {
 
 func (m *Model) incrementVolumeCmd() tea.Cmd {
 	return func() tea.Msg {
-		volumeInfo, err := m.changeVolume(utils.GetConfig().Librespot.VolumeStep)
+		step := utils.GetConfig().Player.VolumeStep
+		if step <= 0 {
+			step = 5
+		}
+		volumeInfo, err := m.changeVolume(step)
 		if err != nil {
 			return transportErrMsg{err: err, action: "Failed to increase volume"}
 		}
@@ -493,7 +462,11 @@ func (m *Model) incrementVolumeCmd() tea.Cmd {
 
 func (m *Model) decrementVolumeCmd() tea.Cmd {
 	return func() tea.Msg {
-		volumeInfo, err := m.changeVolume(-utils.GetConfig().Librespot.VolumeStep)
+		step := utils.GetConfig().Player.VolumeStep
+		if step <= 0 {
+			step = 5
+		}
+		volumeInfo, err := m.changeVolume(-step)
 		if err != nil {
 			return transportErrMsg{err: err, action: "Failed to decrease volume"}
 		}

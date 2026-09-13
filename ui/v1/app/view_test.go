@@ -14,7 +14,7 @@ func TestViewHidesHelpLineInZenMode(t *testing.T) {
 
 	view := model.View()
 
-	if !strings.Contains(view.Content, "LAZYSPOTIFY") {
+	if !strings.Contains(view.Content, "CASSETTE") {
 		t.Fatalf("view = %q, expected player to render in zen mode", view.Content)
 	}
 	if strings.Contains(view.Content, "toggle help") {

@@ -8,9 +8,9 @@ import (
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"github.com/dubeyKartikay/lazyspotify/core/utils"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/medialist"
+	"cassette/core/utils"
+	"cassette/ui/v1/common"
+	"cassette/ui/v1/medialist"
 )
 
 type styles struct {
@@ -253,6 +253,10 @@ func (m *Model) selectedEntity() (common.Entity, bool) {
 
 func (m *Model) selectionSignature(entity common.Entity) string {
 	return fmt.Sprintf("%s\x00%s\x00%s", entity.ID, entity.Name, entity.Desc)
+}
+
+func (m *Model) SearchFocused() bool {
+	return m.searchFocused
 }
 
 func (m *Model) CloseInfo() {

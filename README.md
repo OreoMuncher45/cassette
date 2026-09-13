@@ -1,222 +1,158 @@
-> ✍️ I write about building tools like this at [dubeykartikay.com](https://dubeykartikay.com).
-
 <div align="center">
-  <img width="220" src="./docs/assets/logo.png" alt="lazyspotify logo" />
-  <h1>lazyspotify</h1>
-  <p>A terminal Spotify client.</p>
-  <p>
-    <a href="https://github.com/dubeyKartikay/lazyspotify/releases"><img src="https://img.shields.io/github/v/release/dubeyKartikay/lazyspotify?label=release" alt="Release"/></a>
-    <a href="https://github.com/dubeyKartikay/lazyspotify/actions/workflows/release.yml"><img src="https://github.com/dubeyKartikay/lazyspotify/actions/workflows/release.yml/badge.svg" alt="Release workflow"/></a>
-    <a href="./LICENSE"><img src="https://img.shields.io/github/license/dubeyKartikay/lazyspotify" alt="License"/></a>
-  </p>
+
+```
+╭░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░╮
+│ (o)  ╭───╮                                                         (o) │
+│      │ B │  ──────────────────────────────────────────  [ ]IN [ ]OUT   │
+│      ╰───╯                                                             │
+│  ╭──────────────────────────────────────────────────────────────────╮  │
+│  │                  CASSETTE • RETRO SPOTIFY TUI                    │  │
+│  │          ▄███▄          ╭─────────────╮          ▄███▄           │  │
+│  │         █▀ █ ▀█         │███ │ │ │  █ │         █▀ █ ▀█          │  │
+│  │        █ ▄ █ ▄ █        │███ │ │ │  █ │        █ ▄ █ ▄ █         │  │
+│  │         █▄ █ ▄█         │███ │ │ │  █ │         █▄ █ ▄█          │  │
+│  │          ▀███▀          ╰─────────────╯          ▀███▀           │  │
+│  ├──────────────────────────────────────────────────────────────────┤  │
+│  │          01:23 [████████────────] 03:45   ▶ PLAYING ⇌            │  │
+│  ╰──────────────────────────────────────────────────────────────────╯  │
+│░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░│
+│    ╲   ( )                                                  ( )   ╱    │
+│(o)  ╲         ( )                                    ( )         ╱  (o)│
+╰──────╲──────────────────────────────────────────────────────────╱──────╯
+```
+
+# cassette
+
+**A high-fidelity, retro ANSI animated cassette tape music player for Spotify.**  
+*Because every other Spotify client is either a 500MB Electron dumpster fire or looks like an Excel spreadsheet from 1994.*
+
+[![Go Version](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+[![Platform](https://img.shields.io/badge/platform-Linux-blue.svg)](https://github.com)
+
 </div>
 
+---
 
-![LazySpotify](docs/assets/lazyspotify-start.png)
+## Why does this exist? (The Rant)
+
+Every modern Spotify client has completely lost the plot:
+
+1. **The Official Spotify Desktop App**: Consumes 2GB of RAM, renders web views inside web views, constantly shoves podcasts and unskippable clutter down your throat, and takes 10 seconds just to open a search bar.
+2. **Generic "Terminal" Spotify TUIs**: Most CLI players are dead, broken, abandoned, or sterile. They render lifeless white tables that look like a corporate tax audit. No style, no warmth, no joy.
+3. **The "Play on Device" Nightmare**: Half the terminal clients out there don't even play sound. You press play, and nothing happens because you have to spend 4 hours configuring external daemon sockets, broken D-Bus hooks, and third-party audio servers.
+
+**Enough.**
+
+**cassette** was built with a simple philosophy: **Music should feel like physical media again.**
+You get a handcrafted, pixel-aligned ANSI cassette tape that physically spins in real time inside your terminal. It connects directly to Spotify, features automated background playback with an integrated `librespot` engine, auto-queues endless song radio, and stays lightning fast.
+
+---
+
+## Features
+
+- **Animated ANSI Cassette Art**: Realistic rotating 6-tooth gear sprockets, calibrated tape window, dynamic supply/take-up spools that transfer tape in real time, and HUD metadata.
+- **Standalone Terminal Audio**: Bundled with native `librespot` Spotify Connect support. No official Spotify desktop client needed. Your PC shows up natively as `cassette`.
+- **Endless Song Radio**: Playing any track from search automatically seeds Spotify's similar-track recommendation engine, queueing endless continuous playback so the music never stops.
+- **Distraction-Free Keybindings**: Full keyboard controls for search, playlists, tracks, albums, devices, volume, seeking, and shuffle.
+- **Zero Electron Bloat**: Pure Go + Bubble Tea + Lipgloss. Fast startup, minimal CPU usage, and low memory footprint.
+
+---
 
 ## Requirements
 
-- A Spotify Premium account.
-- A working system keyring.
-- The patched `lazyspotify-librespot` daemon (only if you are installing from source or running an unpackaged build)
-- On Linux, one of `wl-clipboard`, `xclip`, or `xsel` if you want clipboard support on the auth screen.
+- **Spotify Premium** account (required by Spotify for Web API playback & Spotify Connect).
+- **Linux** (PulseAudio / PipeWire).
+- **librespot** (installed on Arch via `pacman -S librespot`, or auto-detected by `cassette`).
+- Standard terminal with UTF-8 support (Kitty, Konsole, Alacritty, WezTerm, iTerm2, etc.).
 
-## Install
+---
 
-### Homebrew
+## Quick Install
 
-```bash
-brew tap dubeyKartikay/lazyspotify
-brew install lazyspotify
-```
+### One-Command Installer
 
-### Arch Linux
+Clone the repo and run the automated installer:
 
 ```bash
-yay -S lazyspotify-bin
+git clone https://github.com/OreoMuncher45/cassette.git
+cd cassette
+chmod +x install.sh && ./install.sh
 ```
 
-### Nix
+This compiles the binary and installs it directly to `~/.local/bin/cassette`.
 
-Available in [Nixpkgs](https://search.nixos.org/packages?channel=unstable&query=lazyspotify#show=lazyspotify).
+*(Ensure `~/.local/bin` is in your `$PATH`)*.
 
-```bash
-nix run nixpkgs#lazyspotify
-```
+---
 
-### GitHub Releases
+## Setup (5 Minutes)
 
-Download the latest package from [GitHub Releases](https://github.com/dubeyKartikay/lazyspotify/releases).
+Spotify requires a free Client ID to talk to their API with PKCE authorization.
 
-- macOS: signed `.zip`
-- Ubuntu/Debian: `.deb`
-- Fedora/RHEL: `.rpm`
-- Arch: `.tar.gz`
+### 1. Get a Free Spotify Client ID
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
+2. Log in and click **Create App**.
+3. Fill in:
+   - **App name**: `cassette`
+   - **App description**: `Terminal cassette player`
+   - **Redirect URI**: `http://127.0.0.1:8080/callback` (and `http://127.0.0.1:5588/login` for librespot)
+   - Check **Web API** and accept terms.
+4. Open the app settings and copy your **Client ID**.
 
-Example package installs:
-
-```bash
-sudo dpkg -i lazyspotify-*.deb
-sudo dnf install ./lazyspotify-*.rpm
-```
-
-### Build From Source
-
-Build the app:
-
-```bash
-git clone https://github.com/dubeyKartikay/lazyspotify.git
-cd lazyspotify
-make build
-```
-
-Then build the patched daemon from [`dubeyKartikay/go-librespot`](https://github.com/dubeyKartikay/go-librespot) and point `librespot.daemon.cmd` at that binary in your config.
-
-If you build `lazyspotify` yourself and do not compile in a packaged daemon path, `librespot.daemon.cmd` is required.
-
-## Demos
-
-### Play A Track From Playlist > Track
-
-![Play a track from a playlist](docs/assets/demos/playlist-track-play.gif)
-
-### Player Controls
-
-![Player controls](docs/assets/demos/player-controls.gif)
-
-### Library Navigation
-
-![Library navigation](docs/assets/demos/library-navigation.gif)
-
-### Search
-
-![Search navigation](docs/assets/demos/search-navigation.gif)
-
-## Set Up Your Spotify Client ID
-
-`lazyspotify` requires your own Spotify app client ID.
-
-1. Open the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
-2. Create a new app with:
-   - App name: `lazyspotify`
-   - App description: `terminal based spotify client`
-   - Website: `https://github.com/dubeyKartikay/lazyspotify`
-   - Redirect URIs: `http://127.0.0.1:8287/callback`
-   - APIs used: `Web API`, `Web Playback SDK`
-3. Copy the app's Client ID.
-4. Put the Client ID in `config.yml` or export it as an environment variable. See [Configuration](https://github.com/dubeyKartikay/lazyspotify?tab=readme-ov-file#configuration).
-
-Minimal config:
+### 2. Configure Cassette
+Create `~/.config/cassette/config.yml`:
 
 ```yaml
 auth:
-  client_id: your_spotify_app_client_id
+  client_id: <YOUR_SPOTIFY_CLIENT_ID>
 ```
 
-Environment override:
+*(Replace `<YOUR_SPOTIFY_CLIENT_ID>` with your actual client ID)*.
+
+### 3. One-Time Audio Setup (Optional)
+To authorize your terminal as a local audio speaker:
 
 ```bash
-export AUTH_CLIENT_ID=your_spotify_app_client_id
+cassette setup
 ```
 
-If you change `auth.host`, `auth.port`, or `auth.redirect-endpoint`, update the Spotify app Redirect URI to match exactly.
+A browser window will pop up asking you to approve Spotify Connect. Once approved, `cassette` will permanently register as your PC's playback device.
 
-## Configuration
+---
 
-Config file locations:
+## Usage
 
-- macOS: `~/Library/Application Support/lazyspotify/config.yml`
-- Linux: `~/.config/lazyspotify/config.yml`
-
-If the file is missing, lazyspotify creates `config.yml` with:
-
-```yaml
-auth:
-  client_id: your_spotify_app_client_id
-```
-
-Then replace `your_spotify_app_client_id` with your Spotify app Client ID.
-
-Minimal config for package installs:
-
-```yaml
-auth:
-  client_id: your_spotify_app_client_id
-```
-
-Minimal config for source or manual installs:
-
-```yaml
-auth:
-  client_id: your_spotify_app_client_id
-
-librespot:
-  daemon:
-    cmd:
-      - /absolute/path/to/lazyspotify-librespot
-```
-
-The generated daemon config is written automatically under the `librespot/` subdirectory inside the app config directory. You usually do not need to edit it manually.
-
-### Auth Settings
-
-| Key | Required | Default | Notes |
-| --- | --- | --- | --- |
-| `log_level` | No | `ERROR` | App log level for `lazyspotify`. |
-| `auth.client_id` | Yes | none | Your Spotify app client ID. |
-| `auth.host` | No | `127.0.0.1` | Host used for the local OAuth callback server. |
-| `auth.port` | No | `8287` | Port used for the local OAuth callback server. |
-| `auth.redirect-endpoint` | No | `/callback` | Callback path for Spotify OAuth. |
-| `auth.timeout` | No | `30` | Auth server shutdown timeout in seconds. |
-| `auth.keyring.service` | No | `spotify` | Keyring service name for stored tokens. |
-| `auth.keyring.key` | No | `token-v2` | Keyring key for stored tokens. |
-
-### Librespot Settings
-
-| Key | Required | Default | Notes |
-| --- | --- | --- | --- |
-| `librespot.host` | No | `127.0.0.1` | Host for the local playback API server. |
-| `librespot.port` | No | `4040` | Port for the local playback API server. |
-| `librespot.timeout` | No | `180` | Playback API timeout in seconds. |
-| `librespot.retry-delay` | No | `100` | Retry delay in milliseconds. |
-| `librespot.max-retries` | No | `3` | Retry count for daemon calls. |
-| `librespot.seek-step-ms` | No | `5000` | Seek step size in milliseconds. |
-| `librespot.volume-step` | No | `20` | Volume step percentage (0-100) used for volume controls. |
-| `librespot.daemon.cmd` | Sometimes | none | Required for source/manual installs unless a packaged daemon path was compiled into the binary. |
-| `librespot.daemon.log_level` | No | `ERROR` | Log level written into the generated librespot daemon config. |
-| `librespot.daemon.zeroconf_enabled` | No | `false` | Enables zeroconf in the daemon config. |
-
-Environment variables can override config values by replacing `.` and `-` with `_`. Examples: `LOG_LEVEL`, `AUTH_CLIENT_ID`, `LIBRESPOT_DAEMON_LOG_LEVEL`.
-
-## Run
-
-Start the app with:
+Simply run:
 
 ```bash
-lazyspotify
+cassette
 ```
 
-If you built from source:
+### Keybindings
 
-```bash
-./target/lazyspotify
-```
+| Key | Action |
+|---|---|
+| `Space` | Play / Pause |
+| `n` | Next Track |
+| `p` | Previous Track |
+| `+` / `-` | Volume Up / Down |
+| `>` / `<` | Seek Forward / Backward (5s) |
+| `s` | Toggle Shuffle |
+| `/` | Search Tracks, Artists, Playlists |
+| `Tab` / `P` | Toggle Library / Media Panel |
+| `d` | Switch Playback Device |
+| `?` | Toggle Help Menu |
+| `Ctrl+C` | Quit |
 
-Print build metadata:
+---
 
-```bash
-lazyspotify version
-```
+## Keywords
 
-## Development
+`spotify` • `tui` • `terminal` • `cassette` • `retro` • `ansi-art` • `ascii-art` • `librespot` • `music-player` • `cli` • `bubbletea` • `lipgloss` • `golang` • `linux`
 
-```bash
-make run
-go test ./...
-```
+---
 
-## Community
+## License
 
-- [Code of Conduct](./.github/CODE_OF_CONDUCT.md)
-- [Contributing Guide](./.github/CONTRIBUTING.md)
-- [Security Policy](./.github/SECURITY.md)
+MIT © [OreoMuncher45](https://github.com/OreoMuncher45)

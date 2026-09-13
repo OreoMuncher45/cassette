@@ -5,7 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 
-	"github.com/dubeyKartikay/lazyspotify/core/utils"
+	"cassette/core/utils"
 )
 
 type AuthConfig struct {

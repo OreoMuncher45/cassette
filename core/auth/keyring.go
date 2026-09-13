@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"runtime"
 
-	"github.com/dubeyKartikay/lazyspotify/core/logger"
-	"github.com/dubeyKartikay/lazyspotify/core/utils"
+	"cassette/core/logger"
+	"cassette/core/utils"
 	"github.com/zalando/go-keyring"
 	"golang.org/x/oauth2"
 )
@@ -22,10 +22,18 @@ func NewSpotifyKeyring() *Keyring {
 
 func (k *Keyring) GetString(key string) (string, error) {
 	value, err := keyring.Get(k.service, key)
-	if err != nil {
-		return "", wrapKeyringError(err)
+	if err == nil {
+		return value, nil
 	}
-	return value, nil
+	if errors.Is(err, keyring.ErrNotFound) && k.service == "cassette" {
+		for _, fallbackSvc := range []string{"spotify", "lazyspotify"} {
+			if val, fbErr := keyring.Get(fallbackSvc, key); fbErr == nil && val != "" {
+				_ = keyring.Set(k.service, key, val)
+				return val, nil
+			}
+		}
+	}
+	return "", wrapKeyringError(err)
 }
 
 func (k *Keyring) SetString(key, value string) error {
@@ -61,7 +69,7 @@ func wrapKeyringError(err error) error {
 
 	if runtime.GOOS == "linux" {
 		return fmt.Errorf(
-			"system keyring unavailable: %w; lazyspotify requires a working Linux keyring and will not fall back to plaintext token storage",
+			"system keyring unavailable: %w; cassette requires a working Linux keyring and will not fall back to plaintext token storage",
 			err,
 		)
 	}

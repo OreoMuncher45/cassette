@@ -22,7 +22,7 @@ type styles struct {
 
 func NewModel() Model {
 	return Model{
-		display: "Lazyspotify: The cutest terminal music player",
+		display: "Cassette: The retro terminal Spotify player",
 		styles: styles{
 			panel: lipgloss.NewStyle().
 				BorderStyle(lipgloss.RoundedBorder()).

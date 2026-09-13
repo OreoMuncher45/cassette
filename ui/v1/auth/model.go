@@ -1,7 +1,7 @@
 package auth
 
 import (
-	"github.com/dubeyKartikay/lazyspotify/core/auth"
+	"cassette/core/auth"
 )
 
 type State int

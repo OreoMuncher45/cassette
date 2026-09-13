@@ -4,12 +4,12 @@ import "testing"
 
 func TestCalcVolumeDeltaScalesWithMaxVolume(t *testing.T) {
 	tests := []struct {
-		name       string
-		maxVolume  int
+		name        string
+		maxVolume   int
 		stepPercent int
-		want       int
+		want        int
 	}{
-		{"20% of librespot max", 65535, 20, 13107},
+		{"20% of 65535 max", 65535, 20, 13107},
 		{"20% of 100", 100, 20, 20},
 		{"negative step decrements", 65535, -20, -13107},
 		{"5% matches old hardcoded value", 65535, 5, 3276},

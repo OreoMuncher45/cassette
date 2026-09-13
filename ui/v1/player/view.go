@@ -8,9 +8,11 @@ import (
 
 func (m *Model) View(zenMode bool) string {
 	cassetteView := m.cassette.View()
-	cassetteW, cassetteH := lipgloss.Width(cassetteView), lipgloss.Height(cassetteView)
-	var buttonsView string
+	if zenMode {
+		return m.style.Render(cassetteView)
+	}
 
+	var buttonsView string
 	for i := range m.controls {
 		if i == len(m.controls)/2 {
 			buttonsView = lipgloss.JoinHorizontal(lipgloss.Left, buttonsView, "  ", m.controls[i].View())
@@ -19,18 +21,18 @@ func (m *Model) View(zenMode bool) string {
 		buttonsView = lipgloss.JoinHorizontal(lipgloss.Left, buttonsView, " ", m.controls[i].View())
 	}
 
-	playerW := max(lipgloss.Width(buttonsView), cassetteW) + 2
-	playerH := cassetteH + lipgloss.Height(buttonsView)
-	playerShellView := m.style.Render(playerShell(playerW, playerH))
-	cassetteX := playerW - cassetteW - 2
-	layers := []*lipgloss.Layer{
-		lipgloss.NewLayer(playerShellView).ID("player"),
-		lipgloss.NewLayer(cassetteView).X(cassetteX).Y(0).ID("cassette"),
+	cassetteW := lipgloss.Width(cassetteView)
+	buttonsW := lipgloss.Width(buttonsView)
+	pad := max(0, (cassetteW-buttonsW)/2)
+
+	btnLines := strings.Split(buttonsView, "\n")
+	for idx := range btnLines {
+		btnLines[idx] = strings.Repeat(" ", pad) + btnLines[idx]
 	}
-	if(!zenMode) {
-		layers = append(layers,lipgloss.NewLayer(buttonsView).X(cassetteX).Y(playerH - lipgloss.Height(buttonsView)).ID("buttons"))
-	}
-	return lipgloss.NewCompositor(layers...).Render()
+	alignedButtons := strings.Join(btnLines, "\n")
+
+	content := lipgloss.JoinVertical(lipgloss.Left, cassetteView, "", alignedButtons)
+	return m.style.Render(content)
 }
 
 func playerShell(innerW int, innerH int) string {

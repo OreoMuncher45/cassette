@@ -3,7 +3,7 @@ package medialist
 import (
 	"testing"
 
-	"github.com/dubeyKartikay/lazyspotify/ui/v1/common"
+	"cassette/ui/v1/common"
 )
 
 func TestNewModelDisablesListQuitKeybindings(t *testing.T) {
