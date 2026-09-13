@@ -66,13 +66,36 @@ func (m *Model) View() string {
 		cStatus = lipgloss.NewStyle().Foreground(lipgloss.Color("243")).Bold(true)
 	}
 
-	// Album Art Box (22 cols wide, 9 rows tall)
-	artW := 20
-	artH := 8
+	// Album Art Box (Square aspect ratio: width = height * 2)
+	artH := m.height - 2
+	if artH > 22 {
+		artH = 22
+	}
+	if artH < 8 {
+		artH = 8
+	}
+	artW := artH * 2
 
 	var artBlock string
 	if strings.TrimSpace(m.artANSI) != "" {
-		artBlock = m.artANSI
+		lines := strings.Split(m.artANSI, "\n")
+		if len(lines) > artH {
+			lines = lines[:artH]
+		} else if len(lines) < artH {
+			diff := artH - len(lines)
+			padTop := diff / 2
+			padBot := diff - padTop
+			var padded []string
+			for i := 0; i < padTop; i++ {
+				padded = append(padded, "")
+			}
+			padded = append(padded, lines...)
+			for i := 0; i < padBot; i++ {
+				padded = append(padded, "")
+			}
+			lines = padded
+		}
+		artBlock = strings.Join(lines, "\n")
 	} else {
 		// Retro placeholder
 		artLines := []string{

@@ -97,6 +97,14 @@ func (m *Model) handleShellInput(msg tea.Msg) (tea.Cmd, bool) {
 		}
 	case tea.WindowSizeMsg:
 		m.setSize(msg.Width, msg.Height)
+		if m.lastArtworkURL != "" {
+			artCols, artRows := m.desiredArtworkDimensions()
+			if artCols != m.lastArtCols || artRows != m.lastArtRows {
+				m.lastArtCols = artCols
+				m.lastArtRows = artRows
+				return m.fetchArtworkCmd(m.lastArtworkURL, artCols, artRows), true
+			}
+		}
 		return nil, true
 	}
 	return nil, false
@@ -207,9 +215,12 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 
 				if len(msg.state.Item.Album.Images) > 0 {
 					artURL := msg.state.Item.Album.Images[0].URL
-					if artURL != m.lastArtworkURL {
+					artCols, artRows := m.desiredArtworkDimensions()
+					if artURL != m.lastArtworkURL || artCols != m.lastArtCols || artRows != m.lastArtRows {
 						m.lastArtworkURL = artURL
-						extraCmds = append(extraCmds, m.fetchArtworkCmd(artURL, 20, 8))
+						m.lastArtCols = artCols
+						m.lastArtRows = artRows
+						extraCmds = append(extraCmds, m.fetchArtworkCmd(artURL, artCols, artRows))
 					}
 				}
 			}

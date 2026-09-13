@@ -16,6 +16,9 @@ func (m *Model) Update(msg tea.Msg) tea.Cmd {
 		case key.Matches(msg, m.keys.ToggleLyrics):
 			m.ToggleLyrics()
 			return nil
+		case key.Matches(msg, m.keys.ToggleArt):
+			m.ToggleArtwork()
+			return nil
 		case key.Matches(msg, m.keys.ToggleQueue):
 			m.ToggleQueue()
 			return nil

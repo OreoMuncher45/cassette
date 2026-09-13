@@ -30,6 +30,7 @@ type AppKeyMap struct {
 	Devices        key.Binding
 	ToggleQueue    key.Binding
 	ToggleLyrics   key.Binding
+	ToggleArt      key.Binding
 	MediaPanelOpen bool
 	InfoOpen       bool
 }
@@ -136,14 +137,18 @@ func NewAppKeyMap() AppKeyMap {
 			key.WithKeys("l", "L"),
 			key.WithHelp("l", "lyrics"),
 		),
+		ToggleArt: key.NewBinding(
+			key.WithKeys("a", "A"),
+			key.WithHelp("a", "art"),
+		),
 	}
 }
 
 func (k AppKeyMap) ShortHelp() []key.Binding {
 	if k.MediaPanelOpen {
-		return []key.Binding{k.TogglePanel, k.Select, k.Search, k.Back, k.PlayPause, k.ToggleLyrics, k.ToggleQueue, k.Devices, k.Quit}
+		return []key.Binding{k.TogglePanel, k.Select, k.Search, k.Back, k.PlayPause, k.ToggleLyrics, k.ToggleArt, k.ToggleQueue, k.Devices, k.Quit}
 	}
-	return []key.Binding{k.PlayPause, k.NextTrack, k.PrevTrack, k.VolumeUp, k.VolumeDown, k.ToggleLyrics, k.ToggleQueue, k.TogglePanel, k.Devices, k.Quit}
+	return []key.Binding{k.PlayPause, k.NextTrack, k.PrevTrack, k.VolumeUp, k.VolumeDown, k.ToggleLyrics, k.ToggleArt, k.ToggleQueue, k.TogglePanel, k.Devices, k.Quit}
 }
 
 func (k AppKeyMap) FullHelp() [][]key.Binding {

@@ -42,6 +42,8 @@ type Model struct {
 	lastLyricsTrack    string
 	lastLyricsArtist   string
 	lastArtworkURL     string
+	lastArtCols        int
+	lastArtRows        int
 	width              int
 	height             int
 	help               help.Model
@@ -294,6 +296,28 @@ func (m *Model) fetchQueueCmd() tea.Cmd {
 		q, err := m.player.GetQueue(context.Background())
 		return queueLoadedMsg{queue: q, err: err}
 	}
+}
+
+func (m *Model) desiredArtworkDimensions() (cols, rows int) {
+	h := m.height
+	if h <= 0 {
+		return 36, 18
+	}
+	// Total cassette + header is roughly ~24 rows
+	avail := h - 24
+	if avail < 10 {
+		avail = 10
+	} else if avail > 22 {
+		avail = 22
+	}
+	rows = avail - 2
+	if rows < 8 {
+		rows = 8
+	} else if rows > 20 {
+		rows = 20
+	}
+	cols = rows * 2
+	return cols, rows
 }
 
 func (m *Model) fetchArtworkCmd(imageURL string, cols, rows int) tea.Cmd {

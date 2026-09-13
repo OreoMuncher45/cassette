@@ -18,6 +18,7 @@ type LeftPanelMode int
 const (
 	LeftPanelLyrics LeftPanelMode = iota
 	LeftPanelLibrary
+	LeftPanelArtwork
 	LeftPanelClosed
 )
 
@@ -28,6 +29,8 @@ type Model struct {
 	lyricsModel   lyrics.Model
 	queueModel    queue.Model
 	nowPlaying    nowplaying.Model
+	artANSI       string
+	currentSong   common.SongInfo
 	leftPanel     LeftPanelMode
 	queueOpen     bool
 	zenMode       bool
@@ -133,6 +136,15 @@ func (m *Model) ToggleLyrics() {
 	}
 }
 
+func (m *Model) ToggleArtwork() {
+	if m.leftPanel == LeftPanelArtwork {
+		m.leftPanel = LeftPanelLyrics
+	} else {
+		m.leftPanel = LeftPanelArtwork
+		m.mediaPanel.CloseInfo()
+	}
+}
+
 func (m *Model) ToggleQueue() {
 	m.queueOpen = !m.queueOpen
 }
@@ -144,7 +156,7 @@ func (m *Model) SwapLeftPanel() {
 		m.leftPanel = LeftPanelLyrics
 		m.mediaPanel.CloseInfo()
 	} else {
-		m.leftPanel = LeftPanelLibrary
+		m.leftPanel = LeftPanelLyrics
 	}
 }
 
@@ -181,10 +193,12 @@ func (m *Model) SearchFocused() bool {
 }
 
 func (m *Model) SetArtwork(ansi string) {
+	m.artANSI = ansi
 	m.nowPlaying.SetArtwork(ansi)
 }
 
 func (m *Model) SetNowPlayingSong(song common.SongInfo) {
+	m.currentSong = song
 	m.nowPlaying.SetSong(song)
 }
 

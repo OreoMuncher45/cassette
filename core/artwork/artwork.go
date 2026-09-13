@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"fmt"
 	"image"
-	"image/color"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
@@ -135,14 +134,31 @@ func (r *Renderer) ensureDownloaded(ctx context.Context, url string) (string, er
 }
 
 func (r *Renderer) renderWithChafa(filePath string, cols, rows int) (string, error) {
+	// 1. High-definition block + sextants in 24-bit Truecolor.
+	// Provides 2x3 sub-pixel resolution with 100% solid geometric elements (no ASCII punctuation or letters).
 	cmd := exec.Command("chafa",
-		fmt.Sprintf("--size=%dx%d", cols, rows),
+		"--probe=off",
+		"-c", "full",
 		"--format=symbols",
-		"--symbols=half",
-		"--dither=none",
+		"--symbols=block+sextant",
+		fmt.Sprintf("--size=%dx%d", cols, rows),
 		filePath,
 	)
 	out, err := cmd.Output()
+	if err == nil && len(strings.TrimSpace(string(out))) > 0 {
+		return strings.TrimRight(string(out), "\n"), nil
+	}
+
+	// 2. Fallback: Universal quadrant + half blocks (2x2 subpixels)
+	cmd = exec.Command("chafa",
+		"--probe=off",
+		"-c", "full",
+		"--format=symbols",
+		"--symbols=quad+half",
+		fmt.Sprintf("--size=%dx%d", cols, rows),
+		filePath,
+	)
+	out, err = cmd.Output()
 	if err != nil {
 		return "", err
 	}
@@ -169,27 +185,24 @@ func (r *Renderer) renderNativeHalfBlocks(filePath string, cols, rows int) (stri
 		return "", fmt.Errorf("empty image bounds")
 	}
 
-	// In terminal, 1 cell height = 2 vertical pixels (▀)
 	pixelH := rows * 2
 	pixelW := cols
 
 	var sb strings.Builder
 
 	for y := 0; y < rows; y++ {
-		yTop := (y * 2 * imgH) / pixelH
-		yBot := ((y*2 + 1) * imgH) / pixelH
+		yTopStart := (y * 2 * imgH) / pixelH
+		yTopEnd := ((y*2 + 1) * imgH) / pixelH
+		yBotStart := ((y*2 + 1) * imgH) / pixelH
+		yBotEnd := ((y*2 + 2) * imgH) / pixelH
 
 		for x := 0; x < cols; x++ {
-			xSrc := (x * imgW) / pixelW
+			xStart := (x * imgW) / pixelW
+			xEnd := ((x + 1) * imgW) / pixelW
 
-			topCol := img.At(bounds.Min.X+xSrc, bounds.Min.Y+yTop)
-			botCol := img.At(bounds.Min.X+xSrc, bounds.Min.Y+yBot)
+			r1, g1, b1 := averageAreaRGB(img, bounds.Min.X+xStart, bounds.Min.X+xEnd, bounds.Min.Y+yTopStart, bounds.Min.Y+yTopEnd)
+			r2, g2, b2 := averageAreaRGB(img, bounds.Min.X+xStart, bounds.Min.X+xEnd, bounds.Min.Y+yBotStart, bounds.Min.Y+yBotEnd)
 
-			r1, g1, b1 := toRGB255(topCol)
-			r2, g2, b2 := toRGB255(botCol)
-
-			// \x1b[38;2;r;g;bm = foreground (top pixel ▀)
-			// \x1b[48;2;r;g;bm = background (bottom pixel)
 			sb.WriteString(fmt.Sprintf("\x1b[38;2;%d;%d;%dm\x1b[48;2;%d;%d;%dm▀", r1, g1, b1, r2, g2, b2))
 		}
 		sb.WriteString("\x1b[0m")
@@ -201,7 +214,27 @@ func (r *Renderer) renderNativeHalfBlocks(filePath string, cols, rows int) (stri
 	return sb.String(), nil
 }
 
-func toRGB255(c color.Color) (uint8, uint8, uint8) {
-	r, g, b, _ := c.RGBA()
-	return uint8(r >> 8), uint8(g >> 8), uint8(b >> 8)
+func averageAreaRGB(img image.Image, x0, x1, y0, y1 int) (uint8, uint8, uint8) {
+	if x1 <= x0 {
+		x1 = x0 + 1
+	}
+	if y1 <= y0 {
+		y1 = y0 + 1
+	}
+
+	var sumR, sumG, sumB, count uint64
+	for y := y0; y < y1; y++ {
+		for x := x0; x < x1; x++ {
+			r, g, b, _ := img.At(x, y).RGBA()
+			sumR += uint64(r >> 8)
+			sumG += uint64(g >> 8)
+			sumB += uint64(b >> 8)
+			count++
+		}
+	}
+
+	if count == 0 {
+		return 0, 0, 0
+	}
+	return uint8(sumR / count), uint8(sumG / count), uint8(sumB / count)
 }
