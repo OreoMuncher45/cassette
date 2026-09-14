@@ -31,7 +31,8 @@
 [![Platform](https://img.shields.io/badge/platform-Linux-blue.svg)](https://github.com)
 
 </div>
-
+## Preview
+<a href="https://imgbb.com/"><img src="https://i.ibb.co/5xcF3JbB/32320.gif" alt="32320" border="0"></a>
 ---
 
 ## Why does this exist? (The Rant)
