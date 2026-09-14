@@ -37,41 +37,75 @@ func setupPCHandler(args []string) {
 	fmt.Println("╰──────────────────────────────────────────────────────────────────────────╯")
 
 	mode := ""
+	autostart := true // Enabled by default as a convenience
 	for _, a := range args[1:] {
 		if a == "--minimal" || a == "-m" {
 			mode = "minimal"
 		} else if a == "--full" || a == "-f" {
 			mode = "full"
+		} else if a == "--autostart" {
+			autostart = true
+		} else if a == "--no-autostart" {
+			autostart = false
 		}
 	}
 
 	if mode == "" {
-		fmt.Println("\nChoose your setup profile:")
-		fmt.Println("")
-		fmt.Println("  [1] Minimal Setup (Recommended)")
-		fmt.Println("      • Terminal Spotify Connect audio daemon (librespot).")
-		fmt.Println("      • Built-in 24-bit Truecolor ANSI Half-Block Album Art (▀).")
-		fmt.Println("      • Zero extra dependencies needed. Works natively out of the")
-		fmt.Println("        box in Konsole, Alacritty, Kitty, WezTerm, and any terminal.")
-		fmt.Println("")
-		fmt.Println("  [2] Full Setup")
-		fmt.Println("      • Everything in Minimal (librespot + built-in ANSI art).")
-		fmt.Println("      • Installs 'chafa' (Char Fast Art) for advanced terminal")
-		fmt.Println("        sub-block dithering & multi-protocol scaling.")
-		fmt.Println("")
-		fmt.Print("Enter choice [1: Minimal / 2: Full] (default: 1): ")
-
 		reader := bufio.NewReader(os.Stdin)
-		input, _ := reader.ReadString('\n')
-		input = strings.TrimSpace(input)
-		if input == "2" || strings.EqualFold(input, "full") {
-			mode = "full"
-		} else {
-			mode = "minimal"
+		for {
+			checkMark := "[✔]"
+			checkStatus := "ENABLED"
+			if !autostart {
+				checkMark = "[ ]"
+				checkStatus = "DISABLED"
+			}
+
+			fmt.Println("\nChoose your setup profile:")
+			fmt.Println("")
+			fmt.Println("  [1] Minimal Setup (Recommended)")
+			fmt.Println("      • Terminal Spotify Connect audio daemon (librespot).")
+			fmt.Println("      • Built-in 24-bit Truecolor ANSI Half-Block Album Art (▀).")
+			fmt.Println("      • Zero extra dependencies needed. Works natively out of the")
+			fmt.Println("        box in Konsole, Alacritty, Kitty, WezTerm, and any terminal.")
+			fmt.Println("")
+			fmt.Println("  [2] Full Setup")
+			fmt.Println("      • Everything in Minimal (librespot + built-in ANSI art).")
+			fmt.Println("      • Installs 'chafa' (Char Fast Art) for advanced terminal")
+			fmt.Println("        sub-block dithering & multi-protocol scaling.")
+			fmt.Println("")
+			fmt.Printf("  [3] %s Auto-start Cassette on boot (%s)\n", checkMark, checkStatus)
+			fmt.Println("      • Launch Cassette automatically when logging into your desktop.")
+			fmt.Println("      • Purely local Freedesktop file (~/.config/autostart/cassette.desktop).")
+			fmt.Println("")
+			fmt.Print("Enter choice [1: Minimal / 2: Full / 3: Toggle Autostart] (default: 1): ")
+
+			input, _ := reader.ReadString('\n')
+			input = strings.TrimSpace(input)
+			if input == "3" || strings.EqualFold(input, "autostart") {
+				autostart = !autostart
+				if autostart {
+					fmt.Println("\n--> Auto-start on boot: [✔] ENABLED")
+				} else {
+					fmt.Println("\n--> Auto-start on boot: [ ] DISABLED")
+				}
+				continue
+			}
+
+			if input == "2" || strings.EqualFold(input, "full") {
+				mode = "full"
+			} else {
+				mode = "minimal"
+			}
+			break
 		}
 	}
 
-	fmt.Printf("\n--> Selected Profile: %s\n\n", strings.ToUpper(mode))
+	autostartStatus := "[✔] ENABLED"
+	if !autostart {
+		autostartStatus = "[ ] DISABLED"
+	}
+	fmt.Printf("\n--> Selected Profile: %s\n", strings.ToUpper(mode))
+	fmt.Printf("--> Auto-start on boot: %s\n\n", autostartStatus)
 
 	if mode == "full" {
 		fmt.Println("Checking for 'chafa'...")
@@ -172,6 +206,15 @@ func setupPCHandler(args []string) {
 			fmt.Printf("\n✓ %s\n", line)
 			fmt.Println("✓ Cassette successfully connected to Spotify!")
 			fmt.Println("✓ 'cassette' is now active in your Spotify devices list.")
+			if autostart {
+				if err := utils.EnableAutostart(); err == nil {
+					fmt.Println("✓ Auto-start on boot configured (~/.config/autostart/cassette.desktop)")
+				} else {
+					fmt.Printf("Notice: could not configure autostart: %v\n", err)
+				}
+			} else {
+				_ = utils.DisableAutostart()
+			}
 			fmt.Println("Run 'cassette' to start playing music through your terminal.")
 			_ = cmd.Process.Signal(os.Interrupt)
 			return
@@ -208,6 +251,8 @@ func printUsage() {
 	fmt.Println("  --version   Print build metadata")
 	fmt.Println("Commands:")
 	fmt.Println("  setup       Authenticate and configure local PC audio playback ('cassette' device)")
+	fmt.Println("              Options: --minimal, --full, --autostart, --no-autostart")
 	fmt.Println("  auth        Authenticate with Spotify Web API")
 	fmt.Println("  version     Print build metadata")
 }
+

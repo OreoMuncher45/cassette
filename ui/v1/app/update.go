@@ -215,6 +215,7 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 			m.playing = msg.state.CurrentlyPlaying.Playing
 			var extraCmds []tea.Cmd
 			if msg.state.Item != nil {
+				m.lastTrackID = string(msg.state.Item.ID)
 				artist := joinArtists(msg.state.Item.Artists)
 				track := msg.state.Item.Name
 				m.songInfo = common.SongInfo{
@@ -318,6 +319,8 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 			text = "Shuffle: ON 🔀"
 		}
 		m.mediaCenter.SetDisplay(text)
+		return m.pollPlayerStateCmd(), true
+	case mprisPollStateMsg:
 		return m.pollPlayerStateCmd(), true
 	case transportErrMsg:
 		logger.Log.Error().Err(msg.err).Str("action", msg.action).Msg("transport action failed")

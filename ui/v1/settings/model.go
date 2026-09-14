@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"cassette/core/theme"
+	"cassette/core/utils"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 )
@@ -15,6 +16,7 @@ const (
 	ItemScheme ItemKind = iota
 	ItemEffect
 	ItemSpeed
+	ItemAutostart
 )
 
 type SettingOption struct {
@@ -58,6 +60,9 @@ func NewModel() Model {
 		{Kind: ItemSpeed, ID: string(theme.SpeedMedium), Label: "Speed: Groove (Medium)", Description: "Balanced, rhythmic visual transitions"},
 		{Kind: ItemSpeed, ID: string(theme.SpeedFast), Label: "Speed: Hyper (Fast)", Description: "High-energy rave RGB visual cycling"},
 		{Kind: ItemSpeed, ID: string(theme.SpeedUltra), Label: "Speed: Ultra (Ludicrous)", Description: "Maximum-velocity dynamic color shifting"},
+
+		// System
+		{Kind: ItemAutostart, ID: "autostart", Label: "Autostart on Boot", Description: "Launch Cassette automatically when logging into your desktop"},
 	}
 
 	return Model{
@@ -122,6 +127,8 @@ func (m *Model) Update(msg tea.Msg) (tea.Cmd, bool) {
 				th.SetEffect(theme.EffectID(opt.ID))
 			case ItemSpeed:
 				th.SetSpeed(theme.SpeedID(opt.ID))
+			case ItemAutostart:
+				_, _ = utils.ToggleAutostart()
 			}
 		}
 		return nil, true
@@ -189,6 +196,8 @@ func (m *Model) View() string {
 				listLines = append(listLines, stSection.Render("── VISUAL EFFECTS ─────────────────────────────────────"))
 			case ItemSpeed:
 				listLines = append(listLines, stSection.Render("── ANIMATION SPEED ────────────────────────────────────"))
+			case ItemAutostart:
+				listLines = append(listLines, stSection.Render("── SYSTEM INTEGRATION ─────────────────────────────────"))
 			}
 			lastKind = opt.Kind
 		}
@@ -201,11 +210,17 @@ func (m *Model) View() string {
 			isSelectedActive = (settings.Effect == theme.EffectID(opt.ID))
 		case ItemSpeed:
 			isSelectedActive = (settings.Speed == theme.SpeedID(opt.ID))
+		case ItemAutostart:
+			isSelectedActive = utils.IsAutostartEnabled()
 		}
 
 		radio := "[ ]"
 		if isSelectedActive {
-			radio = stActiveRadio.Render("[●]")
+			if opt.Kind == ItemAutostart {
+				radio = stActiveRadio.Render("[✔]")
+			} else {
+				radio = stActiveRadio.Render("[●]")
+			}
 		}
 
 		descW := boxW - 32

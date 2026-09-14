@@ -13,6 +13,7 @@ import (
 	"cassette/core/auth"
 	"cassette/core/logger"
 	corelyrics "cassette/core/lyrics"
+	"cassette/core/mpris"
 	coreplayer "cassette/core/player"
 	"cassette/core/ticker"
 	"cassette/core/utils"
@@ -48,6 +49,9 @@ type Model struct {
 	lastArtworkURL     string
 	lastArtCols        int
 	lastArtRows        int
+	lastTrackID        string
+	mprisServer        *mpris.Server
+	program            *tea.Program
 	width              int
 	height             int
 	help               help.Model
@@ -77,6 +81,8 @@ type playTrackOkMsg struct {
 }
 
 type startupCompleteMsg struct{}
+
+type mprisPollStateMsg struct{}
 
 type playerStateMsg struct {
 	state *spotapi.PlayerState
@@ -161,7 +167,9 @@ func newHelpModel() help.Model {
 
 func Run() error {
 	model := NewModel()
-	_, err := tea.NewProgram(model).Run()
+	p := tea.NewProgram(model)
+	model.program = p
+	_, err := p.Run()
 	model.shutdown()
 	return err
 }
@@ -195,6 +203,9 @@ func (m *Model) setSize(width, height int) {
 }
 
 func (m *Model) shutdown() {
+	if m.mprisServer != nil {
+		_ = m.mprisServer.Close()
+	}
 	if m.localDaemon != nil {
 		m.localDaemon.Stop()
 	}
@@ -234,6 +245,7 @@ func (m *Model) start() error {
 	}
 
 	m.player = coreplayer.NewPlayer(m.spotifyClient.RawClient(), "", "")
+	m.initMpris()
 
 	// Fetch initial devices
 	devs, err := m.player.GetDevices(ctx)
@@ -421,6 +433,7 @@ func (m *Model) updatePlayerStatus() {
 		devName = m.player.GetDeviceName()
 	}
 	m.mediaCenter.SetNowPlayingStatus(m.playing, devName, shuffled)
+	m.updateMprisState()
 }
 
 func (m *Model) playPause() error {
@@ -651,3 +664,165 @@ func ExitIfRunFails(err error) {
 func IsZenMode() bool {
 	return os.Getenv("ZEN_MODE") != ""
 }
+
+func (m *Model) updateMprisState() {
+	if m.mprisServer == nil {
+		return
+	}
+	shuffled := false
+	if m.player != nil {
+		shuffled = m.player.Shuffled()
+	}
+	m.mprisServer.UpdatePlayback(mpris.PlaybackState{
+		Playing:    m.playing,
+		Title:      m.songInfo.Title,
+		Artist:     m.songInfo.Artist,
+		Album:      m.songInfo.Album,
+		ArtURL:     m.lastArtworkURL,
+		TrackID:    m.lastTrackID,
+		PositionMs: m.songInfo.Position,
+		DurationMs: m.songInfo.Duration,
+		Volume:     m.volumeInfo.Volume,
+		Shuffled:   shuffled,
+	})
+}
+
+func (m *Model) initMpris() {
+	if m.mprisServer != nil {
+		return
+	}
+
+	cb := mpris.Callbacks{
+		OnPlayPause: func() error {
+			if m.player == nil {
+				return fmt.Errorf("player not initialized")
+			}
+			err := m.playPause()
+			if m.program != nil {
+				m.program.Send(mprisPollStateMsg{})
+			}
+			return err
+		},
+		OnPlay: func() error {
+			if m.player == nil {
+				return fmt.Errorf("player not initialized")
+			}
+			if !m.playing {
+				err := m.playPause()
+				if m.program != nil {
+					m.program.Send(mprisPollStateMsg{})
+				}
+				return err
+			}
+			return nil
+		},
+		OnPause: func() error {
+			if m.player == nil {
+				return fmt.Errorf("player not initialized")
+			}
+			if m.playing {
+				err := m.playPause()
+				if m.program != nil {
+					m.program.Send(mprisPollStateMsg{})
+				}
+				return err
+			}
+			return nil
+		},
+		OnNext: func() error {
+			if m.player == nil {
+				return fmt.Errorf("player not initialized")
+			}
+			err := m.next()
+			if m.program != nil {
+				m.program.Send(mprisPollStateMsg{})
+			}
+			return err
+		},
+		OnPrevious: func() error {
+			if m.player == nil {
+				return fmt.Errorf("player not initialized")
+			}
+			err := m.previous()
+			if m.program != nil {
+				m.program.Send(mprisPollStateMsg{})
+			}
+			return err
+		},
+		OnStop: func() error {
+			if m.player == nil {
+				return fmt.Errorf("player not initialized")
+			}
+			if m.playing {
+				err := m.playPause()
+				if m.program != nil {
+					m.program.Send(mprisPollStateMsg{})
+				}
+				return err
+			}
+			return nil
+		},
+		OnSeek: func(offsetUs int64) error {
+			if m.player == nil {
+				return fmt.Errorf("player not initialized")
+			}
+			offsetMs := int(offsetUs / 1000)
+			err := m.player.Seek(context.Background(), offsetMs, true, m.songInfo.Position)
+			if m.program != nil {
+				m.program.Send(mprisPollStateMsg{})
+			}
+			return err
+		},
+		OnSetPosition: func(trackID string, positionUs int64) error {
+			if m.player == nil {
+				return fmt.Errorf("player not initialized")
+			}
+			posMs := int(positionUs / 1000)
+			err := m.player.Seek(context.Background(), posMs, false, 0)
+			if m.program != nil {
+				m.program.Send(mprisPollStateMsg{})
+			}
+			return err
+		},
+		OnSetVolume: func(volumePercent int) error {
+			if m.player == nil {
+				return fmt.Errorf("player not initialized")
+			}
+			err := m.player.SetVolume(context.Background(), volumePercent)
+			if m.program != nil {
+				m.program.Send(volumeChangedMsg{
+					volumeInfo: common.VolumeInfo{
+						Volume: volumePercent,
+						Max:    100,
+					},
+				})
+			}
+			return err
+		},
+		OnSetShuffle: func(shuffle bool) error {
+			if m.player == nil {
+				return fmt.Errorf("player not initialized")
+			}
+			err := m.shuffle(shuffle)
+			if m.program != nil {
+				m.program.Send(shuffleOkMsg{shuffled: shuffle})
+			}
+			return err
+		},
+		OnQuit: func() error {
+			if m.program != nil {
+				m.program.Quit()
+			}
+			return nil
+		},
+	}
+
+	srv, err := mpris.NewServer(cb)
+	if err != nil {
+		logger.Log.Warn().Err(err).Msg("failed to initialize MPRIS D-Bus server")
+		return
+	}
+	m.mprisServer = srv
+	m.updateMprisState()
+}
+

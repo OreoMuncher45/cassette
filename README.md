@@ -194,20 +194,36 @@ To authorize your terminal as a local audio speaker and configure terminal album
 cassette setup
 ```
 
-When you run `cassette setup`, it will prompt you to choose between two profiles:
+When you run `cassette setup`, it will prompt you to choose between profiles and options:
 
 * **[1] Minimal Setup (Default / Recommended)**
   - Configures `librespot` for native terminal Spotify Connect playback.
   - Uses the built-in 24-bit Truecolor ANSI Half-Block Album Art (`▀`) engine.
   - Zero extra dependencies required — works out of the box in Konsole, Alacritty, Kitty, WezTerm, and any 24-bit color terminal.
-  - Can also be run directly with: `cassette setup --minimal`
+  - Direct flag: `cassette setup --minimal`
 
 * **[2] Full Setup**
   - Everything in Minimal (terminal audio + built-in album art).
   - Also installs `chafa` (Char Fast Art) for advanced terminal graphics sub-block dithering and multi-protocol scaling.
-  - Can also be run directly with: `cassette setup --full`
+  - Direct flag: `cassette setup --full`
+
+* **[3] [✔] Auto-start Cassette on boot (Checkmark Option)**
+  - Automatically launches Cassette in your terminal when you log into your desktop.
+  - Generates standard FreeDesktop `~/.config/autostart/cassette.desktop` (purely local, zero network telemetry).
+  - Press `3` to toggle the checkmark before choosing profile `1` or `2`.
+  - Direct flags: `cassette setup --autostart` or `cassette setup --no-autostart`.
+  - Can also be toggled anytime in `F2` Settings under `SYSTEM INTEGRATION`.
 
 A browser window will pop up asking you to approve Spotify Connect. Once approved, `cassette` will permanently register as your PC's playback device.
+
+---
+
+## Linux Media Controls & Bluetooth Earbuds (MPRIS D-Bus)
+
+Cassette automatically registers on the Linux D-Bus session bus as `org.mpris.MediaPlayer2.cassette`:
+- **Bluetooth Earbuds (AVRCP)**: Single-tap play/pause, double-tap next track, and previous track controls work directly from your wireless earbuds.
+- **Hardware Keyboard Media Keys**: Physical `XF86AudioPlay`, `XF86AudioPause`, `XF86AudioNext`, and `XF86AudioPrev` keys control Cassette from any workspace or application, even when minimized or when the screen is locked.
+- **Desktop & Lock Screen Integration**: Real-time track metadata (title, artist, album, album art, length, position) and playback status are displayed in KDE Plasma media widgets, GNOME media center, lock screens, and command-line tools (`playerctl`).
 
 ---
 
@@ -226,7 +242,7 @@ The bottom bar provides quick access to both manager interfaces: `F1 - Keybinds 
 | Key | Action | Description |
 |---|---|---|
 | **`F1`** | **Keybindings Manager** | Instant searchable keybinds manager with live rebinding (`Enter` to rebind, `Ctrl+R` to reset defaults) |
-| **`F2`** | **Visuals & Settings** | Dynamic album art reactive color extraction, RGB effects, themes, and animation speeds |
+| **`F2`** | **Visuals & Settings** | Dynamic album art color extraction, RGB effects, themes, animation speeds, and autostart on boot |
 | `Space` | Play / Pause | Toggle playback on active device |
 | `s` | Toggle Shuffle | Turn shuffle on or off (displays `Shuffle: ON 🔀` / `OFF` HUD toast) |
 | `n` | Next Track | Skip to next track in queue |
