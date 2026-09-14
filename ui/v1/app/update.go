@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"charm.land/bubbles/v2/key"
 	tea "charm.land/bubbletea/v2"
@@ -92,6 +93,9 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 func (m *Model) handleShellInput(msg tea.Msg) (tea.Cmd, bool) {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
+		if m.mediaCenter.SearchFocused() {
+			return nil, false
+		}
 		switch {
 		case key.Matches(msg, m.keys.OpenKeybinds):
 			m.keybindsModel.Open()
@@ -322,6 +326,16 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		return m.pollPlayerStateCmd(), true
 	case mprisPollStateMsg:
 		return m.pollPlayerStateCmd(), true
+	case nextTrackOkMsg, prevTrackOkMsg:
+		m.playing = true
+		m.updatePlayerStatus()
+		return tea.Batch(
+			m.pollPlayerStateCmd(),
+			m.fetchQueueCmd(),
+			tea.Tick(300*time.Millisecond, func(_ time.Time) tea.Msg {
+				return mprisPollStateMsg{}
+			}),
+		), true
 	case transportErrMsg:
 		logger.Log.Error().Err(msg.err).Str("action", msg.action).Msg("transport action failed")
 		m.showActionError(msg.action, msg.err)
@@ -333,6 +347,9 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 func (m *Model) handleTransportInput(msg tea.Msg, centerCmd tea.Cmd) (tea.Cmd, bool) {
 	keyMsg, ok := msg.(tea.KeyPressMsg)
 	if !ok {
+		return nil, false
+	}
+	if m.mediaCenter.SearchFocused() {
 		return nil, false
 	}
 

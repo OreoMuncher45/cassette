@@ -17,9 +17,10 @@ type Player struct {
 	client     *spotify.Client
 	deviceID   spotify.ID
 	deviceName string
-	mu         sync.RWMutex
-	shuffled   bool
-	volume     int
+	mu           sync.RWMutex
+	shuffled     bool
+	volume       int
+	lastTrackURI string
 }
 
 func NewPlayer(client *spotify.Client, deviceID spotify.ID, deviceName string) *Player {
@@ -29,6 +30,24 @@ func NewPlayer(client *spotify.Client, deviceID spotify.ID, deviceName string) *
 		deviceName: deviceName,
 		volume:     50,
 	}
+}
+
+func (p *Player) SetLastTrackURI(uri string) {
+	if p == nil || uri == "" {
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.lastTrackURI = uri
+}
+
+func (p *Player) GetLastTrackURI() string {
+	if p == nil {
+		return ""
+	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.lastTrackURI
 }
 
 func (p *Player) SetDevice(deviceID spotify.ID, deviceName string) {
@@ -127,6 +146,8 @@ func (p *Player) PlayTrack(ctx context.Context, uri string, contextURI string) e
 		return err
 	}
 
+	p.SetLastTrackURI(uri)
+
 	// Trigger endless song radio ONLY when playing an individual track without context
 	if !isContextPlayback && !isContextURI && strings.HasPrefix(uri, "spotify:track:") {
 		go p.queueSongRadio(uri)
@@ -202,7 +223,21 @@ func (p *Player) Next(ctx context.Context) error {
 		return fmt.Errorf("spotify client is not initialized")
 	}
 	logger.Log.Info().Msg("skipping to next track via web api")
-	if err := p.client.NextOpt(ctx, p.playOptions()); err != nil {
+	err := p.client.NextOpt(ctx, p.playOptions())
+	if err != nil && p.playOptions() != nil {
+		err = p.client.Next(ctx)
+	}
+	if err != nil {
+		if strings.Contains(err.Error(), "Restriction violated") {
+			logger.Log.Warn().Msg("next track restricted (no upcoming queue); attempting endless radio fallback")
+			seed := p.GetLastTrackURI()
+			if seed != "" {
+				p.queueSongRadio(seed)
+				time.Sleep(250 * time.Millisecond)
+				_ = p.client.Next(ctx)
+				return nil
+			}
+		}
 		logger.Log.Error().Err(err).Msg("failed to skip to next track")
 		return err
 	}
@@ -214,7 +249,15 @@ func (p *Player) Previous(ctx context.Context) error {
 		return fmt.Errorf("spotify client is not initialized")
 	}
 	logger.Log.Info().Msg("skipping to previous track via web api")
-	if err := p.client.PreviousOpt(ctx, p.playOptions()); err != nil {
+	err := p.client.PreviousOpt(ctx, p.playOptions())
+	if err != nil && p.playOptions() != nil {
+		err = p.client.Previous(ctx)
+	}
+	if err != nil {
+		if strings.Contains(err.Error(), "Restriction violated") {
+			logger.Log.Info().Msg("previous track restricted; seeking to start of track")
+			return p.Seek(ctx, 0, false, 0)
+		}
 		logger.Log.Error().Err(err).Msg("failed to skip to previous track")
 		return err
 	}

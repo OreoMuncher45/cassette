@@ -122,7 +122,7 @@ func (p *panel) activeList() *medialist.Model {
 	return p.lists.Peek()
 }
 
-func (p *panel) Update(msg tea.Msg, keys common.AppKeyMap) tea.Cmd {
+func (p *panel) Update(msg tea.Msg, keys *common.AppKeyMap) tea.Cmd {
 	switch msg := msg.(type) {
 	case tea.KeyPressMsg:
 		switch {

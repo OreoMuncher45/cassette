@@ -55,9 +55,12 @@ type Model struct {
 	width              int
 	height             int
 	help               help.Model
-	keys               common.AppKeyMap
+	keys               *common.AppKeyMap
 	requestHandlers    map[common.MediaRequestKind]func(common.MediaRequest) tea.Cmd
 }
+
+type nextTrackOkMsg struct{}
+type prevTrackOkMsg struct{}
 
 type mediaLoadedMsg struct {
 	entities   []common.Entity
@@ -135,7 +138,7 @@ func NewModel() *Model {
 	model := &Model{
 		authModel:     uiauth.NewModel(),
 		devicesModel:  devices.NewModel(false),
-		keybindsModel: keybinds.NewModel(&keys),
+		keybindsModel: keybinds.NewModel(keys),
 		settingsModel: settings.NewModel(),
 		mediaCenter:   mediacenter.NewModel(keys),
 		help:          newHelpModel(),
@@ -531,7 +534,7 @@ func (m *Model) nextCmd() tea.Cmd {
 		if err := m.next(); err != nil {
 			return transportErrMsg{err: err, action: "Failed to skip to next track"}
 		}
-		return nil
+		return nextTrackOkMsg{}
 	}
 }
 
@@ -540,7 +543,7 @@ func (m *Model) previousCmd() tea.Cmd {
 		if err := m.previous(); err != nil {
 			return transportErrMsg{err: err, action: "Failed to skip to previous track"}
 		}
-		return nil
+		return prevTrackOkMsg{}
 	}
 }
 

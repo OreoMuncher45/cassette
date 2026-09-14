@@ -43,8 +43,8 @@ type AppKeyMap struct {
 	InfoOpen       bool
 }
 
-func NewAppKeyMap() AppKeyMap {
-	m := AppKeyMap{
+func NewAppKeyMap() *AppKeyMap {
+	m := &AppKeyMap{
 		ToggleHelp: key.NewBinding(
 			key.WithKeys("?"),
 			key.WithHelp("?", "toggle help"),
@@ -193,6 +193,9 @@ func (k *AppKeyMap) GetRebindActions() []RebindAction {
 }
 
 func (k *AppKeyMap) SetActionKey(id string, newKey string) {
+	if k == nil {
+		return
+	}
 	newKey = strings.TrimSpace(newKey)
 	if newKey == "" {
 		return
@@ -200,40 +203,58 @@ func (k *AppKeyMap) SetActionKey(id string, newKey string) {
 	switch id {
 	case "keybinds":
 		k.OpenKeybinds.SetKeys(newKey)
+		k.OpenKeybinds.SetHelp(newKey, "keybinds")
 	case "settings":
 		k.OpenSettings.SetKeys(newKey)
+		k.OpenSettings.SetHelp(newKey, "settings")
 	case "play_pause":
 		k.PlayPause.SetKeys(newKey)
+		k.PlayPause.SetHelp(newKey, "play/pause")
 	case "shuffle":
 		k.Shuffle.SetKeys(newKey)
+		k.Shuffle.SetHelp(newKey, "shuffle")
 	case "next_track":
 		k.NextTrack.SetKeys(newKey)
+		k.NextTrack.SetHelp(newKey, "next")
 	case "prev_track":
 		k.PrevTrack.SetKeys(newKey)
+		k.PrevTrack.SetHelp(newKey, "prev")
 	case "volume_up":
 		k.VolumeUp.SetKeys(newKey)
+		k.VolumeUp.SetHelp(newKey, "vol +")
 	case "volume_down":
 		k.VolumeDown.SetKeys(newKey)
+		k.VolumeDown.SetHelp(newKey, "vol -")
 	case "seek_forward":
 		k.SeekForward.SetKeys(newKey)
+		k.SeekForward.SetHelp(newKey, "seek +")
 	case "seek_backward":
 		k.SeekBackward.SetKeys(newKey)
+		k.SeekBackward.SetHelp(newKey, "seek -")
 	case "lyrics":
 		k.ToggleLyrics.SetKeys(newKey)
+		k.ToggleLyrics.SetHelp(newKey, "lyrics")
 	case "art":
 		k.ToggleArt.SetKeys(newKey)
+		k.ToggleArt.SetHelp(newKey, "art")
 	case "queue":
 		k.ToggleQueue.SetKeys(newKey)
+		k.ToggleQueue.SetHelp(newKey, "queue")
 	case "tab":
 		k.TogglePanel.SetKeys(newKey)
+		k.TogglePanel.SetHelp(newKey, "library/lyrics")
 	case "devices":
 		k.Devices.SetKeys(newKey)
+		k.Devices.SetHelp(newKey, "devices")
 	case "zen":
 		k.ZenMode.SetKeys(newKey)
+		k.ZenMode.SetHelp(newKey, "zen mode")
 	case "search":
 		k.Search.SetKeys(newKey)
+		k.Search.SetHelp(newKey, "search")
 	case "quit":
 		k.Quit.SetKeys(newKey)
+		k.Quit.SetHelp(newKey, "quit")
 	}
 	_ = k.SaveCustomKeys()
 }
@@ -243,6 +264,9 @@ func (k *AppKeyMap) GetKeybindsPath() string {
 }
 
 func (k *AppKeyMap) SaveCustomKeys() error {
+	if k == nil {
+		return nil
+	}
 	m := make(map[string][]string)
 	for _, a := range k.GetRebindActions() {
 		m[a.ID] = a.Keys
@@ -255,6 +279,9 @@ func (k *AppKeyMap) SaveCustomKeys() error {
 }
 
 func (k *AppKeyMap) LoadCustomKeys() {
+	if k == nil {
+		return
+	}
 	data, err := os.ReadFile(k.GetKeybindsPath())
 	if err != nil {
 		return
@@ -270,40 +297,58 @@ func (k *AppKeyMap) LoadCustomKeys() {
 		switch id {
 		case "keybinds":
 			k.OpenKeybinds.SetKeys(keys...)
+			k.OpenKeybinds.SetHelp(keys[0], "keybinds")
 		case "settings":
 			k.OpenSettings.SetKeys(keys...)
+			k.OpenSettings.SetHelp(keys[0], "settings")
 		case "play_pause":
 			k.PlayPause.SetKeys(keys...)
+			k.PlayPause.SetHelp(keys[0], "play/pause")
 		case "shuffle":
 			k.Shuffle.SetKeys(keys...)
+			k.Shuffle.SetHelp(keys[0], "shuffle")
 		case "next_track":
 			k.NextTrack.SetKeys(keys...)
+			k.NextTrack.SetHelp(keys[0], "next")
 		case "prev_track":
 			k.PrevTrack.SetKeys(keys...)
+			k.PrevTrack.SetHelp(keys[0], "prev")
 		case "volume_up":
 			k.VolumeUp.SetKeys(keys...)
+			k.VolumeUp.SetHelp(keys[0], "vol +")
 		case "volume_down":
 			k.VolumeDown.SetKeys(keys...)
+			k.VolumeDown.SetHelp(keys[0], "vol -")
 		case "seek_forward":
 			k.SeekForward.SetKeys(keys...)
+			k.SeekForward.SetHelp(keys[0], "seek +")
 		case "seek_backward":
 			k.SeekBackward.SetKeys(keys...)
+			k.SeekBackward.SetHelp(keys[0], "seek -")
 		case "lyrics":
 			k.ToggleLyrics.SetKeys(keys...)
+			k.ToggleLyrics.SetHelp(keys[0], "lyrics")
 		case "art":
 			k.ToggleArt.SetKeys(keys...)
+			k.ToggleArt.SetHelp(keys[0], "art")
 		case "queue":
 			k.ToggleQueue.SetKeys(keys...)
+			k.ToggleQueue.SetHelp(keys[0], "queue")
 		case "tab":
 			k.TogglePanel.SetKeys(keys...)
+			k.TogglePanel.SetHelp(keys[0], "library/lyrics")
 		case "devices":
 			k.Devices.SetKeys(keys...)
+			k.Devices.SetHelp(keys[0], "devices")
 		case "zen":
 			k.ZenMode.SetKeys(keys...)
+			k.ZenMode.SetHelp(keys[0], "zen mode")
 		case "search":
 			k.Search.SetKeys(keys...)
+			k.Search.SetHelp(keys[0], "search")
 		case "quit":
 			k.Quit.SetKeys(keys...)
+			k.Quit.SetHelp(keys[0], "quit")
 		}
 	}
 }
@@ -311,14 +356,20 @@ func (k *AppKeyMap) LoadCustomKeys() {
 func (k *AppKeyMap) ResetDefaults() {
 	_ = os.Remove(k.GetKeybindsPath())
 	fresh := NewAppKeyMap()
-	*k = fresh
+	*k = *fresh
 }
 
-func (k AppKeyMap) ShortHelp() []key.Binding {
+func (k *AppKeyMap) ShortHelp() []key.Binding {
+	if k == nil {
+		return nil
+	}
 	return []key.Binding{k.OpenKeybinds, k.OpenSettings, k.PlayPause, k.Shuffle, k.Quit}
 }
 
-func (k AppKeyMap) FullHelp() [][]key.Binding {
+func (k *AppKeyMap) FullHelp() [][]key.Binding {
+	if k == nil {
+		return nil
+	}
 	help := [][]key.Binding{
 		{k.ToggleHelp, k.Quit, k.TogglePanel, k.Devices},
 	}
@@ -345,12 +396,16 @@ func (k AppKeyMap) FullHelp() [][]key.Binding {
 	)
 }
 
-func (k AppKeyMap) WithMediaPanelOpen(open bool) AppKeyMap {
-	k.MediaPanelOpen = open
+func (k *AppKeyMap) WithMediaPanelOpen(open bool) *AppKeyMap {
+	if k != nil {
+		k.MediaPanelOpen = open
+	}
 	return k
 }
 
-func (k AppKeyMap) WithInfoOpen(open bool) AppKeyMap {
-	k.InfoOpen = open
+func (k *AppKeyMap) WithInfoOpen(open bool) *AppKeyMap {
+	if k != nil {
+		k.InfoOpen = open
+	}
 	return k
 }

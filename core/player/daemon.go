@@ -33,7 +33,11 @@ func FindLibrespot() (string, error) {
 	if path, err := exec.LookPath("librespot"); err == nil {
 		return path, nil
 	}
-	for _, fallback := range []string{"/usr/bin/librespot", "/usr/local/bin/librespot", "/home/shehriyar/.local/bin/librespot"} {
+	fallbacks := []string{"/usr/bin/librespot", "/usr/local/bin/librespot"}
+	if home, err := os.UserHomeDir(); err == nil {
+		fallbacks = append(fallbacks, filepath.Join(home, ".local", "bin", "librespot"))
+	}
+	for _, fallback := range fallbacks {
 		if fi, err := os.Stat(fallback); err == nil && !fi.IsDir() {
 			return fallback, nil
 		}

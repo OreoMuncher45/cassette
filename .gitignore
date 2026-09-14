@@ -4,5 +4,5 @@ target/
 .context/
 .DS_Store
 dist/
-lazyspotify
-cassette
+/lazyspotify
+/cassette

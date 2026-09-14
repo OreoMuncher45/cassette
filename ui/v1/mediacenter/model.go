@@ -34,10 +34,10 @@ type Model struct {
 	leftPanel     LeftPanelMode
 	queueOpen     bool
 	zenMode       bool
-	keys          common.AppKeyMap
+	keys          *common.AppKeyMap
 }
 
-func NewModel(keys common.AppKeyMap) Model {
+func NewModel(keys *common.AppKeyMap) Model {
 	return Model{
 		mediaPanel:    mediapanel.NewModel(keys),
 		player:        player.NewModel(),

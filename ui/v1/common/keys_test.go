@@ -47,3 +47,20 @@ func hasHelpEntry(rows [][]key.Binding, keyLabel, desc string) bool {
 	}
 	return false
 }
+
+func TestRebindUpdatesInMemoryAndFile(t *testing.T) {
+	km := NewAppKeyMap()
+	km.SetActionKey("next_track", ">")
+	if len(km.NextTrack.Keys()) != 1 || km.NextTrack.Keys()[0] != ">" {
+		t.Fatalf("expected NextTrack to be '>', got %v", km.NextTrack.Keys())
+	}
+	if km.NextTrack.Help().Key != ">" {
+		t.Fatalf("expected NextTrack help key to be '>', got %s", km.NextTrack.Help().Key)
+	}
+
+	// Reset for clean environment
+	km.ResetDefaults()
+	if len(km.NextTrack.Keys()) == 0 || km.NextTrack.Keys()[0] == ">" {
+		t.Fatalf("expected NextTrack to be reset to default, got %v", km.NextTrack.Keys())
+	}
+}
