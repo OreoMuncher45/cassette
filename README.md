@@ -301,6 +301,40 @@ All settings are automatically saved and persistent across sessions.
 
 ---
 
+## Support Cassette
+
+Cassette is free and open source, and it's staying that way. No telemetry, no accounts, no ads, no "Pro" tier, and no plan to add one.
+
+If you enjoy using it and want to throw a few bucks toward development, you can do so here:
+
+| Asset | Address |
+|---|---|
+| **Nano (XNO)** — instant, feeless, no minimum | `nano_1zqdw3qf1z8k3jx8jintaiwpo3yz7zqh1me4ph5j439ts8hsppx8dzy4xcsz` |
+| **USDC on Base** (EVM) | `0x3f262ee685ced4a8270cece45ebdfdb2b18f54b5` |
+| **Zcash (ZEC)** — shielded unified address | `u1z9k30yyvy63f5w0jypt02kvvw6dcpcgprlhzmsgc57mw6qc8rtuc5tfd9ny4atqhr448udexhkuc8xgl0z5rd9njuxnwl7kh2ahqwcqlydt9dpr4t40eawr5st74as5jed669993epsnwuejnrwv4yrkx065pqvmt0cr8gdwggcv2djp` |
+
+<details>
+<summary><b>Copy-paste block</b></summary>
+
+```
+XNO (Nano):
+nano_1zqdw3qf1z8k3jx8jintaiwpo3yz7zqh1me4ph5j439ts8hsppx8dzy4xcsz
+
+USDC (Base / EVM):
+0x3f262ee685ced4a8270cece45ebdfdb2b18f54b5
+
+ZEC (shielded unified address):
+u1z9k30yyvy63f5w0jypt02kvvw6dcpcgprlhzmsgc57mw6qc8rtuc5tfd9ny4atqhr448udexhkuc8xgl0z5rd9njuxnwl7kh2ahqwcqlydt9dpr4t40eawr5st74as5jed669993epsnwuejnrwv4yrkx065pqvmt0cr8gdwggcv2djp
+```
+
+</details>
+
+> **Why no GitHub Sponsors button?** Sponsors doesn't pay out in Pakistan, and most conventional payment processors won't either. There's genuinely no button missing by accident — crypto is just what works.
+
+Anything is appreciated, nothing is expected. If you'd rather help without spending money, a star, a bug report, or a pull request is just as welcome.
+
+---
+
 ## License
 
 MIT © [OreoMuncher45](https://github.com/OreoMuncher45)
