@@ -29,6 +29,9 @@
 [![Go Version](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Linux-blue.svg)](https://github.com)
+[![Status](https://img.shields.io/badge/status-actively%20developed-brightgreen.svg)](#roadmap)
+
+**Actively developed** — see the [Roadmap](#roadmap) for what's shipping next.
 
 </div>
 
@@ -298,6 +301,34 @@ All settings are automatically saved and persistent across sessions.
 ## Keywords
 
 `spotify` • `tui` • `terminal` • `cassette` • `retro` • `ansi-art` • `ascii-art` • `librespot` • `music-player` • `cli` • `bubbletea` • `lipgloss` • `golang` • `linux`
+
+---
+
+## Roadmap
+
+cassette is actively developed, and this is what's currently in the pipeline.
+
+### 🚧 In progress — Spotify Soloist API migration
+
+Right now cassette bundles `librespot` for playback. Spotify shipped **[Soloist](https://developer.spotify.com/documentation/soloist)** in August 2026 — an official headless Spotify Connect client for Linux, built on **the same playback engine as the official Spotify apps**, with a local WebSocket API for integrations.
+
+Migrating to it unlocks a stack of things we simply cannot do today:
+
+* **HiFi / lossless audio** — up to 24-bit / 44.1 kHz (Premium).
+* **Crossfade & automix** — proper smooth transitions instead of hard cuts (Premium).
+* **Loudness normalization** with peak limiting — no more volume jumping between tracks.
+* **An official playback engine** — retires a whole class of `librespot`-specific bugs.
+* **Jam, Smart Shuffle & Autoplay** — parity with the official Spotify apps.
+
+> Tracking issue: **[#1 — Roadmap: adopt the Spotify Soloist API](https://github.com/OreoMuncher45/cassette/issues/1)**
+
+### Planned
+
+* **Bug squashing pass** — retest the known `librespot`-era failure modes against Soloist and close out whatever it fixes.
+* **Event-driven UI** — drive the cassette animation, metadata HUD and queue panel from real-time playback events instead of polling.
+* More to come — this list grows.
+
+Got a feature request or a bug to report? **[Open an issue](https://github.com/OreoMuncher45/cassette/issues)** — it genuinely gets read.
 
 ---
 
