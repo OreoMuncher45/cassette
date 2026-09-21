@@ -208,9 +208,10 @@ func (c *Client) GetRadioTracks(ctx context.Context, videoID string, count int) 
 	}
 
 	payload := nextRequest{
-		Context:             newInnertubeContext(),
-		VideoID:             videoID,
-		IsAudioOnly:         true,
+		Context:                       newInnertubeContext(),
+		VideoID:                       videoID,
+		PlaylistID:                    "RDAMVM" + videoID,
+		IsAudioOnly:                   true,
 		EnablePersistentPlaylistPanel: true,
 	}
 
@@ -528,7 +529,14 @@ func parseRadioTracks(body map[string]interface{}) []Track {
 				subtitleRuns = navigatePath(rMap, "shortBylineText", "runs")
 			}
 			if runs, ok := subtitleRuns.([]interface{}); ok {
-				t.Artist = extractRunsText(runs)
+				fullText := extractRunsText(runs)
+				parts := strings.Split(fullText, " • ")
+				if len(parts) > 0 {
+					t.Artist = strings.TrimSpace(parts[0])
+				}
+				if len(parts) > 1 {
+					t.Album = strings.TrimSpace(parts[1])
+				}
 			}
 
 			thumbs := navigatePath(rMap, "thumbnail", "thumbnails")

@@ -113,6 +113,10 @@ type ytRadioLoadedMsg struct {
 	err         error
 }
 
+type ytRadioExtendedMsg struct {
+	tracks []ytmusic.Track
+}
+
 type ytTrackEndedMsg struct{}
 
 type playPauseOkMsg struct {
@@ -389,11 +393,37 @@ func (m *Model) seedRadioCmd(videoID string, currentTrack ytmusic.Track) tea.Cmd
 		client := ytmusic.GetClient()
 		tracks, err := client.GetRadioTracks(context.Background(), videoID, 25)
 		if err != nil {
+			logger.Log.Error().Err(err).Str("videoID", videoID).Msg("failed to seed radio tracks")
 			return ytRadioLoadedMsg{seedVideoID: videoID, tracks: nil, err: err}
 		}
-		// Prepend current track to queue so index 0 is currently playing
-		fullQueue := append([]ytmusic.Track{currentTrack}, tracks...)
+		var fullQueue []ytmusic.Track
+		if len(tracks) > 0 && tracks[0].VideoID == videoID {
+			fullQueue = tracks
+			if currentTrack.Title != "" {
+				fullQueue[0].Title = currentTrack.Title
+			}
+			if currentTrack.Artist != "" {
+				fullQueue[0].Artist = currentTrack.Artist
+			}
+			if currentTrack.ArtURL != "" {
+				fullQueue[0].ArtURL = currentTrack.ArtURL
+			}
+		} else {
+			fullQueue = append([]ytmusic.Track{currentTrack}, tracks...)
+		}
+		logger.Log.Info().Int("queueLen", len(fullQueue)).Str("videoID", videoID).Msg("radio queue loaded")
 		return ytRadioLoadedMsg{seedVideoID: videoID, tracks: fullQueue, err: nil}
+	}
+}
+
+func (m *Model) extendRadioCmd(videoID string) tea.Cmd {
+	return func() tea.Msg {
+		client := ytmusic.GetClient()
+		tracks, err := client.GetRadioTracks(context.Background(), videoID, 25)
+		if err != nil {
+			return nil
+		}
+		return ytRadioExtendedMsg{tracks: tracks}
 	}
 }
 
@@ -472,7 +502,13 @@ func (m *Model) playNextYtTrackCmd() tea.Cmd {
 	m.ytQueueIndex++
 	track := m.ytQueue[m.ytQueueIndex]
 	m.updateQueueDisplay()
-	return m.playYtTrackCmd(track)
+
+	var cmds []tea.Cmd
+	cmds = append(cmds, m.playYtTrackCmd(track))
+	if len(m.ytQueue)-m.ytQueueIndex <= 3 {
+		cmds = append(cmds, m.extendRadioCmd(track.VideoID))
+	}
+	return tea.Batch(cmds...)
 }
 
 func (m *Model) playPrevYtTrackCmd() tea.Cmd {

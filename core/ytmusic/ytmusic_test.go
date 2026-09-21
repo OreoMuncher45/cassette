@@ -1,6 +1,7 @@
 package ytmusic
 
 import (
+	"context"
 	"testing"
 )
 
@@ -103,6 +104,38 @@ func TestParseTrackFromShelf_ATVExtraction(t *testing.T) {
 		t.Errorf("expected videoId 'abc123xyz', got %q", track.VideoID)
 	}
 	if track.VideoType != VideoTypeATV {
-		t.Errorf("expected VideoTypeATV, got %q", track.VideoType)
+		t.Errorf("expected VideoTypeATV, got %v", track.VideoType)
+	}
+}
+
+func TestLiveRadio(t *testing.T) {
+	c := GetClient()
+	results, err := c.Search(context.Background(), "Daft Punk Get Lucky", 3)
+	if err != nil {
+		t.Fatalf("Search failed: %v", err)
+	}
+	if len(results.Tracks) == 0 {
+		t.Fatal("no tracks returned from search")
+	}
+
+	vid := results.Tracks[0].VideoID
+	t.Logf("Testing GetRadioTracks with vid: %s", vid)
+	radio, err := c.GetRadioTracks(context.Background(), vid, 25)
+	if err != nil {
+		t.Fatalf("GetRadioTracks failed: %v", err)
+	}
+	t.Logf("Radio returned %d tracks", len(radio))
+	if len(radio) < 5 {
+		t.Fatalf("expected at least 5 radio tracks, got %d", len(radio))
+	}
+	for i := 0; i < len(radio) && i < 10; i++ {
+		tr := radio[i]
+		t.Logf("  Radio Track %d: ID=%q Title=%q Artist=%q Album=%q", i, tr.VideoID, tr.Title, tr.Artist, tr.Album)
+		if tr.VideoID == "" {
+			t.Errorf("track %d has empty VideoID", i)
+		}
+		if tr.Title == "" {
+			t.Errorf("track %d has empty Title", i)
+		}
 	}
 }

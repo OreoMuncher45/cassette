@@ -116,3 +116,21 @@ func TestCleanTrackName(t *testing.T) {
 		}
 	}
 }
+
+func TestLiveFetchLyrics(t *testing.T) {
+	svc := GetService()
+	l, err := svc.FetchLyrics("Get Lucky", "Daft Punk")
+	if err != nil {
+		t.Fatalf("FetchLyrics failed: %v", err)
+	}
+	t.Logf("Lyrics fetched successfully: Synced=%v, WordSynced=%v, Lines=%d", l.HasSynced, l.HasWordSync, len(l.SyncedLyrics))
+
+	// Now test with YouTube Music byline text
+	l2, err := svc.FetchLyrics("Get Lucky (feat. Pharrell Williams and Nile Rodgers)", "Daft Punk, Pharrell Williams & Nile Rodgers • Random Access Memories • 2013")
+	if err != nil {
+		t.Logf("FetchLyrics with raw YouTube metadata failed as expected: %v", err)
+	} else {
+		t.Logf("Lyrics with raw YouTube metadata succeeded! Synced=%v, Lines=%d", l2.HasSynced, len(l2.SyncedLyrics))
+	}
+}
+

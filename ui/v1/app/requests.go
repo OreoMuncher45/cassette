@@ -314,6 +314,8 @@ func (m *Model) handlePlayTrackRequest(request common.MediaRequest) tea.Cmd {
 			Position: 0,
 		}
 		m.mediaCenter.SetDisplayFromSong(m.songInfo)
+		m.playing = true
+		m.playerReady = true
 		m.updatePlayerStatus()
 
 		playCmd := func() tea.Msg {
@@ -329,9 +331,29 @@ func (m *Model) handlePlayTrackRequest(request common.MediaRequest) tea.Cmd {
 		cmds := []tea.Cmd{
 			playCmd,
 			m.fetchLyricsCmd(title, artist),
-			m.seedRadioCmd(videoID, currentTrack),
 			m.waitForMpvTrackEndCmd(),
 		}
+
+		// If user selected a track inside a playlist, play through playlist!
+		if strings.HasPrefix(request.ContextURI, "localpl:") {
+			plID := strings.TrimPrefix(request.ContextURI, "localpl:")
+			if pl, err := playlist.GetPlaylist(plID); err == nil && len(pl.Tracks) > 0 {
+				m.ytQueue = pl.Tracks
+				m.ytQueueIndex = 0
+				for idx, t := range pl.Tracks {
+					if t.VideoID == videoID {
+						m.ytQueueIndex = idx
+						break
+					}
+				}
+				m.updateQueueDisplay()
+			} else {
+				cmds = append(cmds, m.seedRadioCmd(videoID, currentTrack))
+			}
+		} else {
+			cmds = append(cmds, m.seedRadioCmd(videoID, currentTrack))
+		}
+
 		if artURL != "" {
 			artCols, artRows := m.desiredArtworkDimensions()
 			m.lastArtworkURL = artURL

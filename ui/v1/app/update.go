@@ -200,17 +200,17 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		return nil, true
 	case ticker.TickFastMsg:
 		theme.Get().Tick()
-		if m.isFocused {
-			if utils.IsYouTubeMusicMode() && m.mpvPlayer != nil {
-				m.songInfo.Position = m.mpvPlayer.PositionMs()
-				if dur := m.mpvPlayer.DurationMs(); dur > 0 {
-					m.songInfo.Duration = dur
-				}
-				m.playing = m.mpvPlayer.IsPlaying()
-				m.updatePlayerStatus()
-			} else {
-				m.advancePlayback(180)
+		if utils.IsYouTubeMusicMode() && m.mpvPlayer != nil {
+			m.songInfo.Position = m.mpvPlayer.PositionMs()
+			if dur := m.mpvPlayer.DurationMs(); dur > 0 {
+				m.songInfo.Duration = dur
 			}
+			m.playing = m.mpvPlayer.IsPlaying()
+			m.updatePlayerStatus()
+		} else if m.isFocused {
+			m.advancePlayback(180)
+		}
+		if m.isFocused {
 			m.mediaCenter.TickPlayer(m.playing)
 			m.mediaCenter.SetLyricsPosition(m.songInfo.Position)
 		}
@@ -325,10 +325,28 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 			m.updateQueueDisplay()
 		}
 		return nil, true
+	case ytRadioExtendedMsg:
+		if len(msg.tracks) > 0 {
+			seen := make(map[string]bool)
+			for _, t := range m.ytQueue {
+				seen[t.VideoID] = true
+			}
+			for _, t := range msg.tracks {
+				if !seen[t.VideoID] {
+					m.ytQueue = append(m.ytQueue, t)
+					seen[t.VideoID] = true
+				}
+			}
+			m.updateQueueDisplay()
+		}
+		return nil, true
 	case ytTrackEndedMsg:
 		logger.Log.Info().Msg("mpv track finished, auto-advancing queue")
 		nextCmd := m.playNextYtTrackCmd()
-		return tea.Batch(nextCmd, m.waitForMpvTrackEndCmd()), true
+		if nextCmd != nil {
+			return nextCmd, true
+		}
+		return nil, true
 	case lyricsLoadedMsg:
 		if (msg.track == m.lastLyricsTrack && msg.artist == m.lastLyricsArtist) || (m.lastLyricsTrack != "" && strings.Contains(strings.ToLower(m.lastLyricsTrack), strings.ToLower(msg.track))) {
 			if msg.err == nil && msg.lyrics != nil {

@@ -302,6 +302,9 @@ func (p *MpvPlayer) readLoop() {
 					if val, ok := msg["data"].(float64); ok && val >= 0 {
 						p.mu.Lock()
 						p.positionMs = int(val * 1000)
+						if !p.paused {
+							p.playing = true
+						}
 						p.mu.Unlock()
 					}
 				case "duration":
@@ -325,6 +328,7 @@ func (p *MpvPlayer) readLoop() {
 				p.mu.Unlock()
 
 				reason, _ := msg["reason"].(string)
+				logger.Log.Info().Str("reason", reason).Msg("mpv end-file event")
 				if reason == "eof" {
 					select {
 					case p.endCh <- struct{}{}:
@@ -355,6 +359,9 @@ func (p *MpvPlayer) readLoop() {
 				p.mu.Lock()
 				if int(rid) == 101 && val >= 0 {
 					p.positionMs = int(val * 1000)
+					if !p.paused {
+						p.playing = true
+					}
 				} else if int(rid) == 102 && val > 0 {
 					p.durationMs = int(val * 1000)
 				}
@@ -366,7 +373,7 @@ func (p *MpvPlayer) readLoop() {
 
 // pollPosition periodically queries mpv for the current position and duration.
 func (p *MpvPlayer) pollPosition() {
-	ticker := time.NewTicker(500 * time.Millisecond)
+	ticker := time.NewTicker(250 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -374,13 +381,6 @@ func (p *MpvPlayer) pollPosition() {
 		case <-p.stopCh:
 			return
 		case <-ticker.C:
-			p.mu.RLock()
-			active := p.playing
-			p.mu.RUnlock()
-			if !active {
-				continue
-			}
-
 			// Query position with dedicated IDs
 			_ = p.sendCommandWithID(101, "get_property", "time-pos")
 			_ = p.sendCommandWithID(102, "get_property", "duration")
