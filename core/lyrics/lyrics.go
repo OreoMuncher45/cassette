@@ -95,8 +95,16 @@ func GetService() *Service {
 func (s *Service) FetchLyrics(track, artist string) (*Lyrics, error) {
 	track = strings.TrimSpace(track)
 	artist = strings.TrimSpace(artist)
-	if track == "" || artist == "" {
-		return nil, fmt.Errorf("empty track or artist name")
+
+	// If artist is generic YouTube placeholder and track contains " - ", extract artist and track
+	if (artist == "" || artist == "YouTube Music" || artist == "YouTube Track" || artist == "Unknown Artist") && strings.Contains(track, " - ") {
+		parts := strings.SplitN(track, " - ", 2)
+		artist = strings.TrimSpace(parts[0])
+		track = strings.TrimSpace(parts[1])
+	}
+
+	if track == "" {
+		return nil, fmt.Errorf("empty track name")
 	}
 
 	key := strings.ToLower(artist + " - " + track)
@@ -127,7 +135,7 @@ func (s *Service) FetchLyrics(track, artist string) (*Lyrics, error) {
 		return result, nil
 	}
 
-	// 3. Fallback to LRCLIB (line-synced + plain text)
+	// 3. Fallback to LRCLIB (line-synced + search fallback)
 	result, err := s.fetchLRCLIB(cleanTrack, artist)
 	if err != nil {
 		logger.Log.Warn().Err(err).Str("track", track).Msg("all lyrics sources failed")
@@ -280,6 +288,7 @@ type lrclibResponse struct {
 }
 
 func (s *Service) fetchLRCLIB(track, artist string) (*Lyrics, error) {
+	// 1. Try exact get
 	reqURL := fmt.Sprintf("https://lrclib.net/api/get?track_name=%s&artist_name=%s",
 		url.QueryEscape(track),
 		url.QueryEscape(artist),
@@ -289,26 +298,63 @@ func (s *Service) fetchLRCLIB(track, artist string) (*Lyrics, error) {
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+	if err == nil {
+		req.Header.Set("User-Agent", "cassette-tui/2.0 (https://github.com/OreoMuncher45/cassette)")
+		resp, err := s.client.Do(req)
+		if err == nil {
+			defer resp.Body.Close()
+			if resp.StatusCode == http.StatusOK {
+				var data lrclibResponse
+				if err := json.NewDecoder(resp.Body).Decode(&data); err == nil {
+					return s.lrclibResponseToLyrics(data), nil
+				}
+			}
+		}
+	}
+
+	// 2. Search fallback if exact get returned 404 or failed
+	searchQuery := strings.TrimSpace(track + " " + artist)
+	searchURL := fmt.Sprintf("https://lrclib.net/api/search?q=%s", url.QueryEscape(searchQuery))
+
+	ctxSearch, cancelSearch := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelSearch()
+
+	reqSearch, err := http.NewRequestWithContext(ctxSearch, "GET", searchURL, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Set("User-Agent", "cassette-tui/2.0 (https://github.com/OreoMuncher45/cassette)")
+	reqSearch.Header.Set("User-Agent", "cassette-tui/2.0 (https://github.com/OreoMuncher45/cassette)")
 
-	resp, err := s.client.Do(req)
+	respSearch, err := s.client.Do(reqSearch)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer respSearch.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("lyrics not found (status %d)", resp.StatusCode)
+	if respSearch.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("lyrics not found (status %d)", respSearch.StatusCode)
 	}
 
-	var data lrclibResponse
-	if err := json.NewDecoder(resp.Body).Decode(&data); err != nil {
+	var results []lrclibResponse
+	if err := json.NewDecoder(respSearch.Body).Decode(&results); err != nil {
 		return nil, err
 	}
 
+	if len(results) == 0 {
+		return nil, fmt.Errorf("no lyrics found for %q", searchQuery)
+	}
+
+	// Prefer synced lyrics
+	for _, r := range results {
+		if r.SyncedLyrics != "" {
+			return s.lrclibResponseToLyrics(r), nil
+		}
+	}
+
+	return s.lrclibResponseToLyrics(results[0]), nil
+}
+
+func (s *Service) lrclibResponseToLyrics(data lrclibResponse) *Lyrics {
 	result := &Lyrics{
 		TrackName:  data.TrackName,
 		ArtistName: data.ArtistName,
@@ -328,7 +374,7 @@ func (s *Service) fetchLRCLIB(track, artist string) (*Lyrics, error) {
 		}
 	}
 
-	return result, nil
+	return result
 }
 
 // --- Parsers ---
@@ -597,14 +643,15 @@ func parseTTMLTime(s string) int {
 	}
 }
 
+var stripMediaSuffixRegex = regexp.MustCompile(`(?i)\s*[\(\[](official\s*(music\s*)?video|official\s*audio|audio|video|lyric\s*video|lyrics|hd|4k|visualizer|remaster(ed)?(\s*\d+)?|live[^\)\]]*|bonus\s*track|deluxe(\s*edition)?|feat\.?[^\)\]]*)[\)\]]`)
+
 func cleanTrackName(name string) string {
-	// Cut off at " - " (e.g. "Song - Remastered 2011")
-	if idx := strings.Index(name, " - "); idx != -1 {
-		name = name[:idx]
-	}
-	// Cut off parentheses if they contain remaster/live/version
+	// 1. Strip parenthesized / bracketed media tags like (Official Video), [Audio], [HD], etc.
+	name = stripMediaSuffixRegex.ReplaceAllString(name, "")
+
+	// 2. Cut off at " - " ONLY if preceded or followed by Remaster/Deluxe/Live/etc.
 	low := strings.ToLower(name)
-	for _, kw := range []string{"(remaster", "(live", "(deluxe", "(bonus", "(feat", "(version"} {
+	for _, kw := range []string{" - remaster", " - live", " - deluxe", " - bonus", " - version", " - single"} {
 		if idx := strings.Index(low, kw); idx != -1 {
 			name = strings.TrimSpace(name[:idx])
 			break
@@ -612,3 +659,4 @@ func cleanTrackName(name string) string {
 	}
 	return strings.TrimSpace(name)
 }
+

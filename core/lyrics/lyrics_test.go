@@ -104,6 +104,10 @@ func TestCleanTrackName(t *testing.T) {
 		{"Song (Live at Wembley)", "Song"},
 		{"Song (feat. Artist)", "Song"},
 		{"Normal Song", "Normal Song"},
+		{"Get Lucky (Official Audio)", "Get Lucky"},
+		{"Starboy (Official Music Video)", "Starboy"},
+		{"Song [HD]", "Song"},
+		{"Song (Visualizer)", "Song"},
 	}
 	for _, tc := range tests {
 		got := cleanTrackName(tc.input)

@@ -7,6 +7,7 @@ import (
 
 	tea "charm.land/bubbletea/v2"
 	"cassette/core/logger"
+	"cassette/core/playlist"
 	"cassette/core/utils"
 	"cassette/core/ytmusic"
 	"cassette/ui/v1/common"
@@ -16,11 +17,24 @@ import (
 func (m *Model) handleGetUserPlaylists(request common.MediaRequest) tea.Cmd {
 	if utils.IsYouTubeMusicMode() {
 		return func() tea.Msg {
-			entities := []common.Entity{
+			var entities []common.Entity
+			entities = append(entities,
 				common.NewEntity("🔍 Search YouTube Music", "Press / to search songs, albums & artists", "ytmusic:search", ""),
-				common.NewEntity("⚡ Free Audio Streaming", "No login, credentials, or Spotify Premium needed", "ytmusic:info", ""),
+			)
+
+			// Load local playlists from core/playlist
+			pls := playlist.GetPlaylists()
+			for _, pl := range pls {
+				desc := fmt.Sprintf("%d tracks • Local Playlist", len(pl.Tracks))
+				uri := fmt.Sprintf("localpl:%s", pl.ID)
+				art := ""
+				if len(pl.Tracks) > 0 && pl.Tracks[0].ArtURL != "" {
+					art = pl.Tracks[0].ArtURL
+				}
+				entities = append(entities, common.NewEntity(pl.Name, desc, uri, art))
 			}
-			pagination := paginationFromOffset(0, len(entities), len(entities), 10)
+
+			pagination := paginationFromOffset(0, len(entities), len(entities), 20)
 			return mediaLoadedMsg{entities: entities, kind: common.Playlists, pagination: pagination, request: request}
 		}
 	}
@@ -174,6 +188,29 @@ func (m *Model) handleSearchArtists(request common.MediaRequest) tea.Cmd {
 }
 
 func (m *Model) handleGetPlaylistTracks(request common.MediaRequest) tea.Cmd {
+	if utils.IsYouTubeMusicMode() || strings.HasPrefix(request.EntityURI, "localpl:") {
+		return func() tea.Msg {
+			plID := strings.TrimPrefix(request.EntityURI, "localpl:")
+			pl, err := playlist.GetPlaylist(plID)
+			if err != nil {
+				return mediaLoadErrMsg{err: err, request: request}
+			}
+			var entities []common.Entity
+			for _, t := range pl.Tracks {
+				desc := t.Artist
+				if t.Album != "" {
+					desc += " • " + t.Album
+				}
+				id := fmt.Sprintf("ytmusic:%s|%s|%s|%s", t.VideoID, t.Title, t.Artist, t.ArtURL)
+				entities = append(entities, common.NewEntity(t.Title, desc, id, t.ArtURL))
+			}
+			if len(entities) == 0 {
+				entities = append(entities, common.NewEntity("Empty Playlist", "Play any song from search to build your library", "ytmusic:empty", ""))
+			}
+			pagination := paginationFromOffset(0, len(entities), len(entities), 50)
+			return mediaLoadedMsg{entities: entities, kind: common.Tracks, pagination: pagination, request: request}
+		}
+	}
 	if m.spotifyClient == nil {
 		return nil
 	}
@@ -224,58 +261,86 @@ func (m *Model) handleGetAlbumTracks(request common.MediaRequest) tea.Cmd {
 }
 
 func (m *Model) handlePlayTrackRequest(request common.MediaRequest) tea.Cmd {
+	// 1. Play local playlist
+	if strings.HasPrefix(request.EntityURI, "localpl:") {
+		plID := strings.TrimPrefix(request.EntityURI, "localpl:")
+		pl, err := playlist.GetPlaylist(plID)
+		if err != nil || len(pl.Tracks) == 0 {
+			return m.mediaCenter.SetStatus(request.PanelKind, "Playlist is empty")
+		}
+		m.ytQueue = pl.Tracks
+		m.ytQueueIndex = 0
+		m.updateQueueDisplay()
+		m.mediaCenter.CloseLibrary()
+		return m.playYtTrackCmd(pl.Tracks[0])
+	}
+
+	// 2. Play YouTube track
 	if utils.IsYouTubeMusicMode() || strings.HasPrefix(request.EntityURI, "ytmusic:") {
 		m.mediaCenter.SetDisplay("Streaming from YouTube Music...")
 		m.mediaCenter.CloseLibrary()
-		return func() tea.Msg {
-			raw := strings.TrimPrefix(request.EntityURI, "ytmusic:")
-			parts := strings.Split(raw, "|")
-			videoID := parts[0]
-			title := "YouTube Track"
-			artist := "YouTube Music"
-			artURL := ""
-			if len(parts) > 1 && parts[1] != "" {
-				title = parts[1]
-			}
-			if len(parts) > 2 && parts[2] != "" {
-				artist = parts[2]
-			}
-			if len(parts) > 3 && parts[3] != "" {
-				artURL = parts[3]
-			}
 
+		raw := strings.TrimPrefix(request.EntityURI, "ytmusic:")
+		parts := strings.SplitN(raw, "|", 4)
+		videoID := parts[0]
+		title := "YouTube Track"
+		artist := "YouTube Music"
+		artURL := ""
+		if len(parts) > 1 && parts[1] != "" {
+			title = parts[1]
+		}
+		if len(parts) > 2 && parts[2] != "" {
+			artist = parts[2]
+		}
+		if len(parts) > 3 && parts[3] != "" {
+			artURL = parts[3]
+		}
+
+		currentTrack := ytmusic.Track{
+			VideoID: videoID,
+			Title:   title,
+			Artist:  artist,
+			ArtURL:  artURL,
+		}
+
+		// Auto-save to Favorites playlist for quick replay
+		_ = playlist.AddTrackToPlaylist("favorites", currentTrack)
+
+		m.lastLyricsTrack = title
+		m.lastLyricsArtist = artist
+		m.songInfo = common.SongInfo{
+			Title:    title,
+			Artist:   artist,
+			Position: 0,
+		}
+		m.mediaCenter.SetDisplayFromSong(m.songInfo)
+		m.updatePlayerStatus()
+
+		playCmd := func() tea.Msg {
 			streamURL := ytmusic.GetClient().GetStreamURL(videoID)
 			if m.mpvPlayer != nil {
 				if err := m.mpvPlayer.Play(streamURL); err != nil {
 					return playTrackErrMsg{err: err, panelKind: request.PanelKind}
 				}
 			}
-			m.playing = true
-			m.playerReady = true
-			m.songInfo = common.SongInfo{
-				Title:    title,
-				Artist:   artist,
-				Position: 0,
-			}
-			m.mediaCenter.SetDisplayFromSong(m.songInfo)
-			m.updatePlayerStatus()
-			if artURL != "" {
-				artCols, artRows := m.desiredArtworkDimensions()
-				m.lastArtworkURL = artURL
-				if m.program != nil {
-					go func() {
-						m.program.Send(m.fetchArtworkCmd(artURL, artCols, artRows)())
-					}()
-				}
-			}
-			if m.program != nil {
-				go func() {
-					m.program.Send(m.fetchLyricsCmd(title, artist)())
-				}()
-			}
 			return playTrackOkMsg{panelKind: request.PanelKind}
 		}
+
+		cmds := []tea.Cmd{
+			playCmd,
+			m.fetchLyricsCmd(title, artist),
+			m.seedRadioCmd(videoID, currentTrack),
+			m.waitForMpvTrackEndCmd(),
+		}
+		if artURL != "" {
+			artCols, artRows := m.desiredArtworkDimensions()
+			m.lastArtworkURL = artURL
+			cmds = append(cmds, m.fetchArtworkCmd(artURL, artCols, artRows))
+		}
+
+		return tea.Batch(cmds...)
 	}
+
 	if m.player == nil {
 		return m.mediaCenter.SetStatus(request.PanelKind, "Player not ready")
 	}

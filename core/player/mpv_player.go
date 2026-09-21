@@ -28,6 +28,7 @@ type MpvPlayer struct {
 	volume     int
 	requestID  int
 	stopCh     chan struct{}
+	endCh      chan struct{}
 }
 
 // NewMpvPlayer starts mpv in idle mode with JSON IPC and returns the player handle.
@@ -78,13 +79,24 @@ func NewMpvPlayer() (*MpvPlayer, error) {
 		sockPath: sockPath,
 		volume:   50,
 		stopCh:   make(chan struct{}),
+		endCh:    make(chan struct{}, 8),
 	}
+
+	// Register property observers with mpv IPC
+	_ = p.sendCommand("observe_property", 1, "time-pos")
+	_ = p.sendCommand("observe_property", 2, "duration")
+	_ = p.sendCommand("observe_property", 3, "pause")
 
 	go p.readLoop()
 	go p.pollPosition()
 
 	logger.Log.Info().Str("socket", sockPath).Msg("mpv player started")
 	return p, nil
+}
+
+// EndChannel returns a channel that signals when the currently playing track finishes (EOF).
+func (p *MpvPlayer) EndChannel() <-chan struct{} {
+	return p.endCh
 }
 
 // Play loads and plays a URL (YouTube Music URL resolved by yt-dlp via mpv).
@@ -230,17 +242,7 @@ type mpvCommand struct {
 	RequestID int           `json:"request_id,omitempty"`
 }
 
-type mpvPropertySet struct {
-	Command   []interface{} `json:"command"`
-	RequestID int           `json:"request_id,omitempty"`
-}
-
-func (p *MpvPlayer) sendCommand(args ...interface{}) error {
-	p.mu.Lock()
-	p.requestID++
-	rid := p.requestID
-	p.mu.Unlock()
-
+func (p *MpvPlayer) sendCommandWithID(rid int, args ...interface{}) error {
 	cmd := mpvCommand{
 		Command:   args,
 		RequestID: rid,
@@ -259,6 +261,15 @@ func (p *MpvPlayer) sendCommand(args ...interface{}) error {
 	_ = p.conn.SetWriteDeadline(time.Now().Add(2 * time.Second))
 	_, err = p.conn.Write(data)
 	return err
+}
+
+func (p *MpvPlayer) sendCommand(args ...interface{}) error {
+	p.mu.Lock()
+	p.requestID++
+	rid := p.requestID
+	p.mu.Unlock()
+
+	return p.sendCommandWithID(rid, args...)
 }
 
 func (p *MpvPlayer) setProperty(name string, value interface{}) error {
@@ -281,14 +292,45 @@ func (p *MpvPlayer) readLoop() {
 			continue
 		}
 
-		// Handle events
+		// Handle property change events from observe_property
 		if event, ok := msg["event"].(string); ok {
 			switch event {
+			case "property-change":
+				name, _ := msg["name"].(string)
+				switch name {
+				case "time-pos":
+					if val, ok := msg["data"].(float64); ok && val >= 0 {
+						p.mu.Lock()
+						p.positionMs = int(val * 1000)
+						p.mu.Unlock()
+					}
+				case "duration":
+					if val, ok := msg["data"].(float64); ok && val > 0 {
+						p.mu.Lock()
+						p.durationMs = int(val * 1000)
+						p.mu.Unlock()
+					}
+				case "pause":
+					if paused, ok := msg["data"].(bool); ok {
+						p.mu.Lock()
+						p.paused = paused
+						p.playing = !paused
+						p.mu.Unlock()
+					}
+				}
 			case "end-file":
 				p.mu.Lock()
 				p.playing = false
 				p.paused = false
 				p.mu.Unlock()
+
+				reason, _ := msg["reason"].(string)
+				if reason == "eof" {
+					select {
+					case p.endCh <- struct{}{}:
+					default:
+					}
+				}
 			case "file-loaded":
 				p.mu.Lock()
 				p.playing = true
@@ -306,12 +348,25 @@ func (p *MpvPlayer) readLoop() {
 				p.mu.Unlock()
 			}
 		}
+
+		// Also handle explicit get_property response data
+		if rid, ok := msg["request_id"].(float64); ok {
+			if val, ok := msg["data"].(float64); ok {
+				p.mu.Lock()
+				if int(rid) == 101 && val >= 0 {
+					p.positionMs = int(val * 1000)
+				} else if int(rid) == 102 && val > 0 {
+					p.durationMs = int(val * 1000)
+				}
+				p.mu.Unlock()
+			}
+		}
 	}
 }
 
 // pollPosition periodically queries mpv for the current position and duration.
 func (p *MpvPlayer) pollPosition() {
-	ticker := time.NewTicker(200 * time.Millisecond)
+	ticker := time.NewTicker(500 * time.Millisecond)
 	defer ticker.Stop()
 
 	for {
@@ -326,9 +381,9 @@ func (p *MpvPlayer) pollPosition() {
 				continue
 			}
 
-			// Query position
-			_ = p.sendCommand("get_property", "time-pos")
-			_ = p.sendCommand("get_property", "duration")
+			// Query position with dedicated IDs
+			_ = p.sendCommandWithID(101, "get_property", "time-pos")
+			_ = p.sendCommandWithID(102, "get_property", "duration")
 		}
 	}
 }

@@ -20,6 +20,7 @@ import (
 	"cassette/core/theme"
 	"cassette/core/ticker"
 	"cassette/core/utils"
+	"cassette/core/ytmusic"
 	"cassette/spotify"
 	uiauth "cassette/ui/v1/auth"
 	"cassette/ui/v1/common"
@@ -63,6 +64,8 @@ type Model struct {
 	keys               *common.AppKeyMap
 	requestHandlers    map[common.MediaRequestKind]func(common.MediaRequest) tea.Cmd
 	welcomeModel       *WelcomeModel
+	ytQueue            []ytmusic.Track
+	ytQueueIndex       int
 }
 
 type nextTrackOkMsg struct{}
@@ -97,6 +100,20 @@ type playerStateMsg struct {
 	state *spotapi.PlayerState
 	err   error
 }
+
+type ytPlayerStateMsg struct {
+	positionMs int
+	durationMs int
+	playing    bool
+}
+
+type ytRadioLoadedMsg struct {
+	seedVideoID string
+	tracks      []ytmusic.Track
+	err         error
+}
+
+type ytTrackEndedMsg struct{}
 
 type playPauseOkMsg struct {
 	playing bool
@@ -334,16 +351,11 @@ func (m *Model) pollPlayerStateCmd() tea.Cmd {
 	return func() tea.Msg {
 		if utils.IsYouTubeMusicMode() {
 			if m.mpvPlayer != nil {
-				pos := m.mpvPlayer.PositionMs()
-				dur := m.mpvPlayer.DurationMs()
-				playing := m.mpvPlayer.IsPlaying()
-				m.playing = playing
-				m.songInfo.Position = pos
-				if dur > 0 {
-					m.songInfo.Duration = dur
+				return ytPlayerStateMsg{
+					positionMs: m.mpvPlayer.PositionMs(),
+					durationMs: m.mpvPlayer.DurationMs(),
+					playing:    m.mpvPlayer.IsPlaying(),
 				}
-				m.mediaCenter.SetLyricsPosition(pos)
-				m.updatePlayerStatus()
 			}
 			return nil
 		}
@@ -356,6 +368,130 @@ func (m *Model) pollPlayerStateCmd() tea.Cmd {
 		state, err := m.player.GetPlayerState(context.Background())
 		return playerStateMsg{state: state, err: err}
 	}
+}
+
+func (m *Model) waitForMpvTrackEndCmd() tea.Cmd {
+	return func() tea.Msg {
+		if m.mpvPlayer == nil {
+			return nil
+		}
+		endCh := m.mpvPlayer.EndChannel()
+		if endCh == nil {
+			return nil
+		}
+		<-endCh
+		return ytTrackEndedMsg{}
+	}
+}
+
+func (m *Model) seedRadioCmd(videoID string, currentTrack ytmusic.Track) tea.Cmd {
+	return func() tea.Msg {
+		client := ytmusic.GetClient()
+		tracks, err := client.GetRadioTracks(context.Background(), videoID, 25)
+		if err != nil {
+			return ytRadioLoadedMsg{seedVideoID: videoID, tracks: nil, err: err}
+		}
+		// Prepend current track to queue so index 0 is currently playing
+		fullQueue := append([]ytmusic.Track{currentTrack}, tracks...)
+		return ytRadioLoadedMsg{seedVideoID: videoID, tracks: fullQueue, err: nil}
+	}
+}
+
+func (m *Model) updateQueueDisplay() {
+	if len(m.ytQueue) == 0 {
+		return
+	}
+	current := m.ytQueue[m.ytQueueIndex]
+	var nextTracks []ytmusic.Track
+	if m.ytQueueIndex+1 < len(m.ytQueue) {
+		nextTracks = m.ytQueue[m.ytQueueIndex+1:]
+	}
+
+	q := &spotapi.Queue{
+		CurrentlyPlaying: spotapi.FullTrack{
+			SimpleTrack: spotapi.SimpleTrack{
+				Name: current.Title,
+				Artists: []spotapi.SimpleArtist{{Name: current.Artist}},
+				URI: spotapi.URI(fmt.Sprintf("ytmusic:%s|%s|%s|%s", current.VideoID, current.Title, current.Artist, current.ArtURL)),
+				Duration: spotapi.Numeric(current.DurationMs),
+			},
+		},
+	}
+	for _, t := range nextTracks {
+		q.Items = append(q.Items, spotapi.FullTrack{
+			SimpleTrack: spotapi.SimpleTrack{
+				Name: t.Title,
+				Artists: []spotapi.SimpleArtist{{Name: t.Artist}},
+				URI: spotapi.URI(fmt.Sprintf("ytmusic:%s|%s|%s|%s", t.VideoID, t.Title, t.Artist, t.ArtURL)),
+				Duration: spotapi.Numeric(t.DurationMs),
+			},
+		})
+	}
+	m.mediaCenter.SetQueue(q)
+}
+
+func (m *Model) playYtTrackCmd(t ytmusic.Track) tea.Cmd {
+	videoID := t.VideoID
+	title := t.Title
+	artist := t.Artist
+	artURL := t.ArtURL
+
+	m.lastLyricsTrack = title
+	m.lastLyricsArtist = artist
+	m.songInfo = common.SongInfo{
+		Title:    title,
+		Artist:   artist,
+		Position: 0,
+		Duration: t.DurationMs,
+	}
+	m.mediaCenter.SetDisplayFromSong(m.songInfo)
+	m.updatePlayerStatus()
+
+	streamURL := ytmusic.GetClient().GetStreamURL(videoID)
+	if m.mpvPlayer != nil {
+		_ = m.mpvPlayer.Play(streamURL)
+	}
+	m.playing = true
+	m.playerReady = true
+
+	var cmds []tea.Cmd
+	cmds = append(cmds, m.fetchLyricsCmd(title, artist))
+	if artURL != "" {
+		artCols, artRows := m.desiredArtworkDimensions()
+		m.lastArtworkURL = artURL
+		cmds = append(cmds, m.fetchArtworkCmd(artURL, artCols, artRows))
+	}
+	cmds = append(cmds, m.waitForMpvTrackEndCmd())
+	return tea.Batch(cmds...)
+}
+
+func (m *Model) playNextYtTrackCmd() tea.Cmd {
+	if len(m.ytQueue) == 0 || m.ytQueueIndex >= len(m.ytQueue)-1 {
+		return nil
+	}
+	m.ytQueueIndex++
+	track := m.ytQueue[m.ytQueueIndex]
+	m.updateQueueDisplay()
+	return m.playYtTrackCmd(track)
+}
+
+func (m *Model) playPrevYtTrackCmd() tea.Cmd {
+	if m.songInfo.Position > 3000 && m.mpvPlayer != nil {
+		_ = m.mpvPlayer.Seek(0)
+		m.songInfo.Position = 0
+		m.updatePlayerStatus()
+		return nil
+	}
+	if m.ytQueueIndex <= 0 || len(m.ytQueue) == 0 {
+		if m.mpvPlayer != nil {
+			_ = m.mpvPlayer.Seek(0)
+		}
+		return nil
+	}
+	m.ytQueueIndex--
+	track := m.ytQueue[m.ytQueueIndex]
+	m.updateQueueDisplay()
+	return m.playYtTrackCmd(track)
 }
 
 func (m *Model) fetchLyricsCmd(track, artist string) tea.Cmd {
@@ -547,6 +683,9 @@ func (m *Model) seekBackward() error {
 }
 
 func (m *Model) next() error {
+	if utils.IsYouTubeMusicMode() {
+		return nil
+	}
 	if m.player == nil {
 		return fmt.Errorf("player not ready")
 	}
@@ -554,6 +693,9 @@ func (m *Model) next() error {
 }
 
 func (m *Model) previous() error {
+	if utils.IsYouTubeMusicMode() {
+		return nil
+	}
 	if m.player == nil {
 		return fmt.Errorf("player not ready")
 	}

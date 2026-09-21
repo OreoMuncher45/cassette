@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/key"
@@ -11,6 +12,7 @@ import (
 	coreplayer "cassette/core/player"
 	"cassette/core/theme"
 	"cassette/core/ticker"
+	"cassette/core/utils"
 	uiauth "cassette/ui/v1/auth"
 	"cassette/ui/v1/common"
 	"cassette/ui/v1/devices"
@@ -199,7 +201,16 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 	case ticker.TickFastMsg:
 		theme.Get().Tick()
 		if m.isFocused {
-			m.advancePlayback(180)
+			if utils.IsYouTubeMusicMode() && m.mpvPlayer != nil {
+				m.songInfo.Position = m.mpvPlayer.PositionMs()
+				if dur := m.mpvPlayer.DurationMs(); dur > 0 {
+					m.songInfo.Duration = dur
+				}
+				m.playing = m.mpvPlayer.IsPlaying()
+				m.updatePlayerStatus()
+			} else {
+				m.advancePlayback(180)
+			}
 			m.mediaCenter.TickPlayer(m.playing)
 			m.mediaCenter.SetLyricsPosition(m.songInfo.Position)
 		}
@@ -297,8 +308,29 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 			m.updatePlayerStatus()
 		}
 		return nil, true
+	case ytPlayerStateMsg:
+		m.playing = msg.playing
+		m.playerReady = true
+		m.songInfo.Position = msg.positionMs
+		if msg.durationMs > 0 {
+			m.songInfo.Duration = msg.durationMs
+		}
+		m.mediaCenter.SetLyricsPosition(msg.positionMs)
+		m.updatePlayerStatus()
+		return nil, true
+	case ytRadioLoadedMsg:
+		if msg.err == nil && len(msg.tracks) > 0 {
+			m.ytQueue = msg.tracks
+			m.ytQueueIndex = 0
+			m.updateQueueDisplay()
+		}
+		return nil, true
+	case ytTrackEndedMsg:
+		logger.Log.Info().Msg("mpv track finished, auto-advancing queue")
+		nextCmd := m.playNextYtTrackCmd()
+		return tea.Batch(nextCmd, m.waitForMpvTrackEndCmd()), true
 	case lyricsLoadedMsg:
-		if msg.track == m.lastLyricsTrack && msg.artist == m.lastLyricsArtist {
+		if (msg.track == m.lastLyricsTrack && msg.artist == m.lastLyricsArtist) || (m.lastLyricsTrack != "" && strings.Contains(strings.ToLower(m.lastLyricsTrack), strings.ToLower(msg.track))) {
 			if msg.err == nil && msg.lyrics != nil {
 				m.mediaCenter.SetLyrics(msg.lyrics)
 			} else {
@@ -412,8 +444,14 @@ func (m *Model) handleTransportInput(msg tea.Msg, centerCmd tea.Cmd) (tea.Cmd, b
 	case key.Matches(keyMsg, m.keys.SeekBackward):
 		return tea.Batch(m.mediaCenter.PressButton(player.SeekBackwardButton), m.seekBackwardCmd(), centerCmd), true
 	case key.Matches(keyMsg, m.keys.NextTrack):
+		if utils.IsYouTubeMusicMode() {
+			return tea.Batch(m.mediaCenter.PressButton(player.NextButton), m.playNextYtTrackCmd(), centerCmd), true
+		}
 		return tea.Batch(m.mediaCenter.PressButton(player.NextButton), m.nextCmd(), centerCmd), true
 	case key.Matches(keyMsg, m.keys.PrevTrack):
+		if utils.IsYouTubeMusicMode() {
+			return tea.Batch(m.mediaCenter.PressButton(player.PreviousButton), m.playPrevYtTrackCmd(), centerCmd), true
+		}
 		return tea.Batch(m.mediaCenter.PressButton(player.PreviousButton), m.previousCmd(), centerCmd), true
 	case key.Matches(keyMsg, m.keys.VolumeDown):
 		return tea.Batch(m.decrementVolumeCmd(), centerCmd), true
