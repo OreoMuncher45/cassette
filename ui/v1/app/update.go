@@ -18,6 +18,26 @@ import (
 )
 
 func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// If welcome popup is open, intercept input FIRST before any other handler
+	if m.welcomeModel != nil && m.welcomeModel.IsOpen() {
+		switch msg := msg.(type) {
+		case tea.KeyPressMsg:
+			if msg.String() == "ctrl+c" {
+				return m, tea.Quit
+			}
+			m.dismissWelcome()
+			return m, nil
+		case tea.WindowSizeMsg:
+			m.setSize(msg.Width, msg.Height)
+			return m, nil
+		default:
+			if cmd, handled := m.handleSystemMessages(msg); handled {
+				return m, cmd
+			}
+			return m, nil
+		}
+	}
+
 	// If search input is focused, route keystrokes directly to mediaCenter and do not trigger global shortcuts
 	if m.mediaCenter.SearchFocused() {
 		if keyMsg, ok := msg.(tea.KeyPressMsg); ok && keyMsg.String() == "ctrl+c" {
@@ -47,24 +67,6 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		newModel, cmd := m.authModel.Update(msg)
 		m.authModel = newModel.(*uiauth.Model)
 		return m, cmd
-	}
-
-	// If welcome popup is open, intercept Enter/Esc/Space to dismiss
-	if m.welcomeModel != nil && m.welcomeModel.IsOpen() {
-		if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
-			switch keyMsg.String() {
-			case "enter", "esc", " ", "escape":
-				m.dismissWelcome()
-				return m, nil
-			case "ctrl+c":
-				return m, tea.Quit
-			}
-			return m, nil
-		}
-		if cmd, handled := m.handleSystemMessages(msg); handled {
-			return m, cmd
-		}
-		return m, nil
 	}
 
 	// If keybinds modal is open, route input to it

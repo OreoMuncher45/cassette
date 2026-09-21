@@ -942,64 +942,55 @@ func (w *WelcomeModel) View() string {
 	accent := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true)
 	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
 	bright := lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
-	border := lipgloss.NewStyle().Foreground(th.BorderColor())
+	cryptoVal := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 
-	w_ := 76
-	hr := border.Render(strings.Repeat("─", w_-4))
+	innerWidth := 70
+	divider := lipgloss.NewStyle().Foreground(th.BorderColor()).Render(strings.Repeat("─", innerWidth))
+
+	title := accent.Render("CASSETTE OVERHAUL — WHAT'S NEW")
+	titleLine := lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(title)
 
 	lines := []string{
-		border.Render("╭" + strings.Repeat("─", w_-2) + "╮"),
-		border.Render("│") + accent.Render(centerPad(" CASSETTE OVERHAUL — WHAT'S NEW ", w_-2)) + border.Render("│"),
-		border.Render("│") + strings.Repeat(" ", w_-2) + border.Render("│"),
-		border.Render("│") + bright.Render(padRight("  🎵 YouTube Music First", w_-2)) + border.Render("│"),
-		border.Render("│") + dim.Render(padRight("     Free streaming, no Spotify Premium required.", w_-2)) + border.Render("│"),
-		border.Render("│") + bright.Render(padRight("  🎙️ Word-Synced Karaoke Lyrics", w_-2)) + border.Render("│"),
-		border.Render("│") + dim.Render(padRight("     Multi-source word-by-word highlighting (LRCLIB, Portato, etc).", w_-2)) + border.Render("│"),
-		border.Render("│") + bright.Render(padRight("  ⚡ Zero-CPU Background", w_-2)) + border.Render("│"),
-		border.Render("│") + dim.Render(padRight("     Animations & artwork rasterization pause when terminal is idle/unfocused.", w_-2)) + border.Render("│"),
-		border.Render("│") + bright.Render(padRight("  🚀 Fixed Boot Autostart", w_-2)) + border.Render("│"),
-		border.Render("│") + dim.Render(padRight("     Reliable startup wrapper in KDE Plasma / GNOME / Wayland.", w_-2)) + border.Render("│"),
-		border.Render("│") + bright.Render(padRight("  🔀 Dual-Source Engine", w_-2)) + border.Render("│"),
-		border.Render("│") + dim.Render(padRight("     YouTube Music default + Spotify mode retained for exclusive tracks.", w_-2)) + border.Render("│"),
-		border.Render("│") + strings.Repeat(" ", w_-2) + border.Render("│"),
-		border.Render("│  ") + hr + border.Render("  │"),
-		border.Render("│") + strings.Repeat(" ", w_-2) + border.Render("│"),
-		border.Render("│") + accent.Render(padRight("  Cassette is 100% free & open source.", w_-2)) + border.Render("│"),
-		border.Render("│") + dim.Render(padRight("  No telemetry, ads, or pro tiers. Ever.", w_-2)) + border.Render("│"),
-		border.Render("│") + strings.Repeat(" ", w_-2) + border.Render("│"),
-		border.Render("│") + bright.Render(padRight("  Support development via crypto donations:", w_-2)) + border.Render("│"),
-		border.Render("│") + dim.Render(padRight("  • Nano (XNO):", w_-2)) + border.Render("│"),
-		border.Render("│") + bright.Render(padRight("    nano_1zqdw3qf1z8k3jx8jintaiwpo3yz7zqh1me4ph5j439ts8hsppx8dzy4xcsz", w_-2)) + border.Render("│"),
-		border.Render("│") + dim.Render(padRight("  • USDC (Base):", w_-2)) + border.Render("│"),
-		border.Render("│") + bright.Render(padRight("    0x3f262ee685ced4a8270cece45ebdfdb2b18f54b5", w_-2)) + border.Render("│"),
-		border.Render("│") + dim.Render(padRight("  • Zcash (ZEC):", w_-2)) + border.Render("│"),
-		border.Render("│") + bright.Render(padRight("    u1z9k30yyvy63f5w0jypt02kvvw6dcpcgprlhzmsgc57mw6qc8rtuc5tfd9ny4at", w_-2)) + border.Render("│"),
-		border.Render("│") + bright.Render(padRight("    qhr448udexhkuc8xgl0z5rd9njuxnwl7kh2ahqwcqlydt9dpr4t40eawr5st74as", w_-2)) + border.Render("│"),
-		border.Render("│") + bright.Render(padRight("    5jed669993epsnwuejnrwv4yrkx065pqvmt0cr8gdwggcv2djp", w_-2)) + border.Render("│"),
-		border.Render("│") + strings.Repeat(" ", w_-2) + border.Render("│"),
-		border.Render("│") + accent.Render(centerPad(" [Press Enter / Esc / Space to dismiss] ", w_-2)) + border.Render("│"),
-		border.Render("╰" + strings.Repeat("─", w_-2) + "╯"),
+		titleLine,
+		"",
+		bright.Render("  🎵 YouTube Music First"),
+		dim.Render("     Free streaming, no Spotify Premium required."),
+		bright.Render("  🎙️ Word-Synced Karaoke Lyrics"),
+		dim.Render("     Multi-source word-by-word highlighting (LRCLIB, Portato, etc)."),
+		bright.Render("  ⚡ Zero-CPU Background"),
+		dim.Render("     Animations & artwork pause when terminal is idle/unfocused."),
+		bright.Render("  🚀 Fixed Boot Autostart"),
+		dim.Render("     Reliable startup wrapper in KDE Plasma / GNOME / Wayland."),
+		bright.Render("  🔀 Dual-Source Engine"),
+		dim.Render("     YouTube Music default + Spotify mode for exclusive tracks."),
+		"",
+		divider,
+		"",
+		accent.Render("  Cassette is 100% free & open source."),
+		dim.Render("  No telemetry, ads, or pro tiers. Ever."),
+		"",
+		bright.Render("  Support development via crypto donations:"),
+		dim.Render("  • Nano (XNO):"),
+		cryptoVal.Render("    nano_1zqdw3qf1z8k3jx8jintaiwpo3yz7zqh1me4ph5j439ts8hsppx8dzy4xcsz"),
+		dim.Render("  • USDC (Base):"),
+		cryptoVal.Render("    0x3f262ee685ced4a8270cece45ebdfdb2b18f54b5"),
+		dim.Render("  • Zcash (ZEC):"),
+		cryptoVal.Render("    u1z9k30yyvy63f5w0jypt02kvvw6dcpcgprlhzmsgc57mw6qc8rtuc5tfd9ny4at"),
+		cryptoVal.Render("    qhr448udexhkuc8xgl0z5rd9njuxnwl7kh2ahqwcqlydt9dpr4t40eawr5st74as"),
+		cryptoVal.Render("    5jed669993epsnwuejnrwv4yrkx065pqvmt0cr8gdwggcv2djp"),
+		"",
+		lipgloss.NewStyle().Width(innerWidth).Align(lipgloss.Center).Render(accent.Render("[Press Any Key to dismiss]")),
 	}
 
-	return strings.Join(lines, "\n")
-}
+	body := strings.Join(lines, "\n")
 
-func centerPad(s string, w int) string {
-	visW := len([]rune(s))
-	if visW >= w {
-		return s
-	}
-	left := (w - visW) / 2
-	right := w - visW - left
-	return strings.Repeat(" ", left) + s + strings.Repeat(" ", right)
-}
+	boxStyle := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(th.BorderColor()).
+		Padding(0, 1).
+		Width(innerWidth + 4)
 
-func padRight(s string, w int) string {
-	visW := len([]rune(s))
-	if visW >= w {
-		return s
-	}
-	return s + strings.Repeat(" ", w-visW)
+	return boxStyle.Render(body)
 }
 
 func (m *Model) initWelcomePopup() {
