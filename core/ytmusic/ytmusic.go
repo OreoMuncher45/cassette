@@ -420,12 +420,29 @@ func parseTrackFromShelf(item interface{}) (Track, bool) {
 	}
 
 	// Extract video type for ATV detection
-	vt := navigatePath(rendererMap, "flexColumnDisplayStyle")
-	if vtStr, ok := vt.(string); ok && vtStr == "MUSIC_RESPONSIVE_LIST_ITEM_FLEX_COLUMN_DISPLAY_STYLE_STACKED" {
-		track.VideoType = VideoTypeATV
+	// 1. Direct musicVideoType from watchEndpoint config (most authoritative)
+	mvtPaths := [][]string{
+		{"overlay", "musicItemThumbnailOverlayRenderer", "content", "musicPlayButtonRenderer", "playNavigationEndpoint", "watchEndpoint", "watchEndpointMusicSupportedConfigs", "watchEndpointMusicConfig", "musicVideoType"},
+		{"navigationEndpoint", "watchEndpoint", "watchEndpointMusicSupportedConfigs", "watchEndpointMusicConfig", "musicVideoType"},
+	}
+	for _, p := range mvtPaths {
+		if mvt := navigatePath(rendererMap, p...); mvt != nil {
+			if mvtStr, ok := mvt.(string); ok && mvtStr != "" {
+				track.VideoType = VideoType(mvtStr)
+				break
+			}
+		}
 	}
 
-	// Better: check from the playbackEndpoint or badge
+	// 2. Check from flexColumnDisplayStyle
+	if track.VideoType == "" {
+		vt := navigatePath(rendererMap, "flexColumnDisplayStyle")
+		if vtStr, ok := vt.(string); ok && vtStr == "MUSIC_RESPONSIVE_LIST_ITEM_FLEX_COLUMN_DISPLAY_STYLE_STACKED" {
+			track.VideoType = VideoTypeATV
+		}
+	}
+
+	// 3. Check for badges explicitly indicating video
 	badgePath := navigatePath(rendererMap, "badges")
 	if badges, ok := badgePath.([]interface{}); ok {
 		for _, badge := range badges {

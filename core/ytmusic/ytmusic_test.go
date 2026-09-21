@@ -69,3 +69,40 @@ func TestGetStreamURL(t *testing.T) {
 		t.Errorf("expected %q, got %q", expected, url)
 	}
 }
+
+func TestParseTrackFromShelf_ATVExtraction(t *testing.T) {
+	// Item with watchEndpointMusicSupportedConfigs indicating ATV
+	item := map[string]interface{}{
+		"musicResponsiveListItemRenderer": map[string]interface{}{
+			"overlay": map[string]interface{}{
+				"musicItemThumbnailOverlayRenderer": map[string]interface{}{
+					"content": map[string]interface{}{
+						"musicPlayButtonRenderer": map[string]interface{}{
+							"playNavigationEndpoint": map[string]interface{}{
+								"watchEndpoint": map[string]interface{}{
+									"videoId": "abc123xyz",
+									"watchEndpointMusicSupportedConfigs": map[string]interface{}{
+										"watchEndpointMusicConfig": map[string]interface{}{
+											"musicVideoType": "MUSIC_VIDEO_TYPE_ATV",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	}
+
+	track, ok := parseTrackFromShelf(item)
+	if !ok {
+		t.Fatal("expected parseTrackFromShelf to succeed")
+	}
+	if track.VideoID != "abc123xyz" {
+		t.Errorf("expected videoId 'abc123xyz', got %q", track.VideoID)
+	}
+	if track.VideoType != VideoTypeATV {
+		t.Errorf("expected VideoTypeATV, got %q", track.VideoType)
+	}
+}
