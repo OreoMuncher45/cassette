@@ -26,7 +26,7 @@ func TestAppConfigSpotifyClientIDTrimsWhitespace(t *testing.T) {
 }
 
 func TestValidateStartupConfigRequiresSpotifyClientID(t *testing.T) {
-	err := validateStartupConfig(AppConfig{})
+	err := validateStartupConfig(AppConfig{DefaultSource: "spotify"})
 	if err == nil {
 		t.Fatal("validateStartupConfig() returned nil, want error")
 	}
@@ -37,7 +37,7 @@ func TestValidateStartupConfigRequiresSpotifyClientID(t *testing.T) {
 }
 
 func TestValidateStartupConfigAcceptsConfiguredSpotifyClientID(t *testing.T) {
-	cfg := AppConfig{}
+	cfg := AppConfig{DefaultSource: "spotify"}
 	cfg.Auth.ClientID = "configured-client-id"
 
 	if err := validateStartupConfig(cfg); err != nil {
@@ -46,7 +46,7 @@ func TestValidateStartupConfigAcceptsConfiguredSpotifyClientID(t *testing.T) {
 }
 
 func TestValidateStartupConfigRejectsPlaceholderSpotifyClientID(t *testing.T) {
-	cfg := AppConfig{}
+	cfg := AppConfig{DefaultSource: "spotify"}
 	cfg.Auth.ClientID = spotifyClientIDPlaceholder
 
 	err := validateStartupConfig(cfg)
@@ -56,6 +56,13 @@ func TestValidateStartupConfigRejectsPlaceholderSpotifyClientID(t *testing.T) {
 	want := "missing required config value `auth.client_id`"
 	if got := err.Error(); !strings.HasPrefix(got, want) {
 		t.Fatalf("validateStartupConfig() error = %q, want prefix %q", got, want)
+	}
+}
+
+func TestValidateStartupConfigYouTubeMusicRequiresNoSpotifyClientID(t *testing.T) {
+	cfg := AppConfig{DefaultSource: "ytmusic"}
+	if err := validateStartupConfig(cfg); err != nil {
+		t.Fatalf("validateStartupConfig() error = %v, want nil", err)
 	}
 }
 

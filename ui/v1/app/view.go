@@ -24,6 +24,13 @@ func (m *Model) View() tea.View {
 		return m.devicesModel.View()
 	}
 
+	// When terminal is unfocused/backgrounded, render a lightweight placeholder
+	// to avoid wasting CPU on ANSI cassette animation and album art rasterization
+	if !m.isFocused {
+		bgPlaceholder := m.backgroundPlaceholderView()
+		return tea.NewView(bgPlaceholder)
+	}
+
 	mediaCenterView := m.mediaCenter.View(m.width, m.height)
 
 	th := theme.Get()
@@ -65,6 +72,15 @@ func (m *Model) View() tea.View {
 			Align(lipgloss.Center, lipgloss.Center).
 			Render(m.settingsModel.View())
 		layers = append(layers, lipgloss.NewLayer(settView).ID("settings"))
+	}
+	// Welcome popup overlay (one-time changelog + donation)
+	if m.welcomeModel != nil && m.welcomeModel.IsOpen() {
+		welcomeView := lipgloss.NewStyle().
+			Width(m.width).
+			Height(m.height).
+			Align(lipgloss.Center, lipgloss.Center).
+			Render(m.welcomeModel.View())
+		layers = append(layers, lipgloss.NewLayer(welcomeView).ID("welcome"))
 	}
 	return tea.NewView(lipgloss.NewCompositor(layers...).Render())
 }

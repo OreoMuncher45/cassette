@@ -47,11 +47,11 @@ func TestAutostartManagement(t *testing.T) {
 		t.Fatalf("failed to read desktop file: %v", err)
 	}
 	content := string(data)
-	if !strings.Contains(content, "Exec=/usr/bin/cassette") {
-		t.Errorf("expected desktop file to contain Exec=%s, got:\n%s", testBin, content)
+	if !strings.Contains(content, "Exec=") || !strings.Contains(content, testBin) {
+		t.Errorf("expected desktop file to contain Exec referencing %s, got:\n%s", testBin, content)
 	}
-	if !strings.Contains(content, "Terminal=true") {
-		t.Errorf("expected desktop file to contain Terminal=true")
+	if !strings.Contains(content, "Terminal=false") {
+		t.Errorf("expected desktop file to contain Terminal=false")
 	}
 
 	// Test Toggle (should disable)

@@ -80,6 +80,9 @@ func (m *Model) View() string {
 	cGray := lipgloss.NewStyle().Foreground(th.BorderColor())
 	cCyan := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true)
 	cActive := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true)
+	cActiveWord := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true).Reverse(true)
+	cSungWord := lipgloss.NewStyle().Foreground(th.PrimaryColor())
+	cFutureWord := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	cFuture := lipgloss.NewStyle().Foreground(lipgloss.Color("252"))
 	cPast := lipgloss.NewStyle().Foreground(lipgloss.Color("242"))
 	cNone := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
@@ -101,9 +104,11 @@ func (m *Model) View() string {
 	}
 
 	type displayRow struct {
-		prefix string
-		text   string
-		style  lipgloss.Style
+		prefix   string
+		text     string
+		style    lipgloss.Style
+		isKaraoke bool
+		words    []lyrics.LyricWord
 	}
 
 	var allRows []displayRow
@@ -148,6 +153,9 @@ func (m *Model) View() string {
 				style = cPast
 			}
 
+			// Check if this line has word-level timing for karaoke
+			hasWords := isActive && len(line.Words) > 0 && m.lyrics.HasWordSync
+
 			chunks := wrapWords(trimmed, maxTextW)
 			for chunkIdx, chunk := range chunks {
 				prefix := "  "
@@ -160,11 +168,17 @@ func (m *Model) View() string {
 				} else if chunkIdx > 0 {
 					prefix = "   "
 				}
-				allRows = append(allRows, displayRow{
+				row := displayRow{
 					prefix: prefix,
 					text:   chunk,
 					style:  style,
-				})
+				}
+				// Only render karaoke on the first chunk of the active line
+				if hasWords && chunkIdx == 0 {
+					row.isKaraoke = true
+					row.words = line.Words
+				}
+				allRows = append(allRows, row)
 			}
 		}
 	} else {
@@ -209,7 +223,13 @@ func (m *Model) View() string {
 		idx := start + r
 		if idx < len(allRows) {
 			row := allRows[idx]
-			rendered := row.style.Render(row.prefix + row.text)
+			var rendered string
+			if row.isKaraoke && len(row.words) > 0 {
+				// Word-by-word karaoke rendering
+				rendered = row.prefix + m.renderKaraokeWords(row.words, cSungWord, cActiveWord, cFutureWord)
+			} else {
+				rendered = row.style.Render(row.prefix + row.text)
+			}
 			contentLines = append(contentLines, rendered)
 		} else {
 			contentLines = append(contentLines, "")
@@ -230,6 +250,25 @@ func (m *Model) View() string {
 	renderedRows = append(renderedRows, footer)
 
 	return strings.Join(renderedRows, "\n")
+}
+
+// renderKaraokeWords renders individual words with karaoke highlighting based on current position.
+func (m *Model) renderKaraokeWords(words []lyrics.LyricWord, cSung, cActive, cFuture lipgloss.Style) string {
+	var parts []string
+	for _, w := range words {
+		text := w.Text
+		if m.positionMs >= w.EndMs {
+			// Already sung
+			parts = append(parts, cSung.Render(text))
+		} else if m.positionMs >= w.StartMs {
+			// Currently being sung
+			parts = append(parts, cActive.Render(text))
+		} else {
+			// Upcoming
+			parts = append(parts, cFuture.Render(text))
+		}
+	}
+	return strings.Join(parts, " ")
 }
 
 func wrapWords(text string, maxW int) []string {

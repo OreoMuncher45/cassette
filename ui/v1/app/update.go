@@ -40,6 +40,24 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
+	// If welcome popup is open, intercept Enter/Esc/Space to dismiss
+	if m.welcomeModel != nil && m.welcomeModel.IsOpen() {
+		if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
+			switch keyMsg.String() {
+			case "enter", "esc", " ", "escape":
+				m.dismissWelcome()
+				return m, nil
+			case "ctrl+c":
+				return m, tea.Quit
+			}
+			return m, nil
+		}
+		if cmd, handled := m.handleSystemMessages(msg); handled {
+			return m, cmd
+		}
+		return m, nil
+	}
+
 	// If keybinds modal is open, route input to it
 	if m.keybindsModel.IsOpen() {
 		kbCmd, handled := m.keybindsModel.Update(msg)
@@ -169,9 +187,11 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		return nil, true
 	case ticker.TickFastMsg:
 		theme.Get().Tick()
-		m.advancePlayback(180)
-		m.mediaCenter.TickPlayer(m.playing)
-		m.mediaCenter.SetLyricsPosition(m.songInfo.Position)
+		if m.isFocused {
+			m.advancePlayback(180)
+			m.mediaCenter.TickPlayer(m.playing)
+			m.mediaCenter.SetLyricsPosition(m.songInfo.Position)
+		}
 		return ticker.DoTickFast(), true
 	case ticker.TickMsg:
 		displayCmd := m.mediaCenter.TickDisplay()
@@ -193,6 +213,8 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		}
 		return tea.Batch(startCmd, m.handleMediaRequest(msg)), true
 	case startupCompleteMsg:
+		// Check if we need to show the welcome popup
+		m.initWelcomePopup()
 		requestCmd := tea.Cmd(func() tea.Msg {
 			return common.RootMediaRequestForListKind(common.Playlists, "")
 		})
@@ -279,7 +301,7 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 		}
 		return nil, true
 	case artworkLoadedMsg:
-		if msg.err == nil && msg.imageURL == m.lastArtworkURL {
+		if msg.err == nil && msg.imageURL == m.lastArtworkURL && m.isFocused {
 			m.mediaCenter.SetArtwork(msg.ansi)
 			cachePath := artwork.GetRenderer().GetCachedPath(msg.imageURL)
 			theme.Get().ExtractPaletteFromImage(cachePath)
@@ -339,6 +361,20 @@ func (m *Model) handleSystemMessages(msg tea.Msg) (tea.Cmd, bool) {
 	case transportErrMsg:
 		logger.Log.Error().Err(msg.err).Str("action", msg.action).Msg("transport action failed")
 		m.showActionError(msg.action, msg.err)
+		return nil, true
+	case tea.FocusMsg:
+		m.isFocused = true
+		logger.Log.Info().Msg("terminal focused — resuming rendering")
+		// Reload artwork on re-focus
+		var cmds []tea.Cmd
+		if m.lastArtworkURL != "" {
+			artCols, artRows := m.desiredArtworkDimensions()
+			cmds = append(cmds, m.fetchArtworkCmd(m.lastArtworkURL, artCols, artRows))
+		}
+		return tea.Batch(cmds...), true
+	case tea.BlurMsg:
+		m.isFocused = false
+		logger.Log.Info().Msg("terminal blurred — suspending rendering")
 		return nil, true
 	}
 	return nil, false

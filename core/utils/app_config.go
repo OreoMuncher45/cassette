@@ -3,10 +3,13 @@ package utils
 import (
 	"errors"
 	"fmt"
-	"github.com/spf13/viper"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+
+	"github.com/spf13/viper"
+	"go.yaml.in/yaml/v3"
 )
 
 const SpotifyClientIDHelpURL = "https://cassette?tab=readme-ov-file#set-up-your-spotify-client-id"
@@ -14,12 +17,13 @@ const SpotifyClientIDHelpURL = "https://cassette?tab=readme-ov-file#set-up-your-
 const (
 	appConfigFileName           = "config.yml"
 	spotifyClientIDPlaceholder  = "your_spotify_app_client_id"
-	defaultAppConfigFileContent = "auth:\n  client_id: your_spotify_app_client_id\n"
+	defaultAppConfigFileContent = "default_source: ytmusic\nauth:\n  client_id: your_spotify_app_client_id\n"
 )
 
 var (
 	config        AppConfig
 	configLoadErr error
+	configMu      sync.RWMutex
 )
 
 func GetConfig() AppConfig {
@@ -34,22 +38,24 @@ func init() {
 }
 
 type AppConfig struct {
-	LogLevel string `mapstructure:"log_level"`
-	Auth     struct {
-		ClientID         string `mapstructure:"client_id"`
-		Host             string `mapstructure:"host"`
-		Port             int    `mapstructure:"port"`
-		RedirectEndpoint string `mapstructure:"redirect-endpoint"`
-		Timeout          int    `mapstructure:"timeout"`
+	DefaultSource      string `mapstructure:"default_source" yaml:"default_source"`
+	SeenWelcomeVersion string `mapstructure:"seen_welcome_version" yaml:"seen_welcome_version,omitempty"`
+	LogLevel           string `mapstructure:"log_level" yaml:"log_level,omitempty"`
+	Auth               struct {
+		ClientID         string `mapstructure:"client_id" yaml:"client_id,omitempty"`
+		Host             string `mapstructure:"host" yaml:"host,omitempty"`
+		Port             int    `mapstructure:"port" yaml:"port,omitempty"`
+		RedirectEndpoint string `mapstructure:"redirect-endpoint" yaml:"redirect-endpoint,omitempty"`
+		Timeout          int    `mapstructure:"timeout" yaml:"timeout,omitempty"`
 		Keyring          struct {
-			Service string `mapstructure:"service"`
-			Key     string `mapstructure:"key"`
-		} `mapstructure:"keyring"`
-	} `mapstructure:"auth"`
+			Service string `mapstructure:"service" yaml:"service,omitempty"`
+			Key     string `mapstructure:"key" yaml:"key,omitempty"`
+		} `mapstructure:"keyring" yaml:"keyring,omitempty"`
+	} `mapstructure:"auth" yaml:"auth,omitempty"`
 	Player struct {
-		SeekStepMs int `mapstructure:"seek-step-ms"`
-		VolumeStep int `mapstructure:"volume-step"`
-	} `mapstructure:"player"`
+		SeekStepMs int `mapstructure:"seek-step-ms" yaml:"seek-step-ms,omitempty"`
+		VolumeStep int `mapstructure:"volume-step" yaml:"volume-step,omitempty"`
+	} `mapstructure:"player" yaml:"player,omitempty"`
 }
 
 func (c AppConfig) SpotifyClientID() string {
@@ -58,6 +64,7 @@ func (c AppConfig) SpotifyClientID() string {
 
 func getDefaultAppConfig() AppConfig {
 	cfg := AppConfig{}
+	cfg.DefaultSource = "ytmusic"
 	cfg.LogLevel = "ERROR"
 	cfg.Auth.Host = "127.0.0.1"
 	cfg.Auth.Port = 8287
@@ -68,6 +75,45 @@ func getDefaultAppConfig() AppConfig {
 	cfg.Player.SeekStepMs = 5000
 	cfg.Player.VolumeStep = 5
 	return cfg
+}
+
+// IsYouTubeMusicMode returns true when the active source is YouTube Music.
+func IsYouTubeMusicMode() bool {
+	src := strings.ToLower(strings.TrimSpace(GetConfig().DefaultSource))
+	return src == "" || src == "ytmusic"
+}
+
+// SaveConfig writes the current in-memory config back to config.yml.
+// Used to persist runtime mutations such as seen_welcome_version.
+func SaveConfig(cfg AppConfig) error {
+	configMu.Lock()
+	defer configMu.Unlock()
+
+	configDir := getConfigDir()
+	if configDir == "" {
+		return fmt.Errorf("cannot resolve config directory")
+	}
+	configPath := filepath.Join(configDir, appConfigFileName)
+
+	data, err := yaml.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("failed to marshal config: %w", err)
+	}
+
+	if err := os.WriteFile(configPath, data, 0644); err != nil {
+		return fmt.Errorf("failed to write config: %w", err)
+	}
+
+	// Update the global in-memory copy
+	config = cfg
+	return nil
+}
+
+// SetSeenWelcomeVersion is a convenience to mark the changelog popup as seen.
+func SetSeenWelcomeVersion(version string) error {
+	cfg := GetConfig()
+	cfg.SeenWelcomeVersion = version
+	return SaveConfig(cfg)
 }
 
 func LoadConfig() (AppConfig, error) {
@@ -104,6 +150,11 @@ func ValidateStartupConfig() error {
 }
 
 func validateStartupConfig(cfg AppConfig) error {
+	// YouTube Music mode requires zero credentials — skip validation
+	src := strings.ToLower(strings.TrimSpace(cfg.DefaultSource))
+	if src == "ytmusic" || (src == "" && IsYouTubeMusicMode()) {
+		return nil
+	}
 	if clientID := cfg.SpotifyClientID(); clientID == "" || clientID == spotifyClientIDPlaceholder {
 		return fmt.Errorf("missing required config value `auth.client_id`; see %s", SpotifyClientIDHelpURL)
 	}
@@ -159,6 +210,7 @@ func SafeGetConfigDir() string {
 
 func applyConfigDefaults(v *viper.Viper) {
 	defaults := getDefaultAppConfig()
+	v.SetDefault("default_source", defaults.DefaultSource)
 	v.SetDefault("log_level", defaults.LogLevel)
 	v.SetDefault("auth.host", defaults.Auth.Host)
 	v.SetDefault("auth.port", defaults.Auth.Port)

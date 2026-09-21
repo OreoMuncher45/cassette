@@ -6,7 +6,7 @@
 │      │ B │  ──────────────────────────────────────────  [ ]IN [ ]OUT   │
 │      ╰───╯                                                             │
 │  ╭──────────────────────────────────────────────────────────────────╮  │
-│  │                  CASSETTE • RETRO SPOTIFY TUI                    │  │
+│  │               CASSETTE • YOUTUBE MUSIC & SPOTIFY TUI              │  │
 │  │          ▄███▄          ╭─────────────╮          ▄███▄           │  │
 │  │         █▀ █ ▀█         │███ │ │ │  █ │         █▀ █ ▀█          │  │
 │  │        █ ▄ █ ▄ █        │███ │ │ │  █ │        █ ▄ █ ▄ █         │  │
@@ -23,8 +23,8 @@
 
 # cassette
 
-**A high-fidelity, retro ANSI animated cassette tape music player for Spotify.**  
-*Because every other Spotify client is either a 500MB Electron dumpster fire or looks like an Excel spreadsheet from 1994.*
+**A high-fidelity, retro ANSI animated cassette tape music player — YouTube Music first, Spotify supported.**  
+*Because every other music client is either a 500MB Electron dumpster fire or looks like an Excel spreadsheet from 1994.*
 
 [![Go Version](https://img.shields.io/badge/go-1.25+-00ADD8?style=flat&logo=go)](https://golang.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
@@ -79,7 +79,7 @@ Somehow, we managed to take **playing music** and turn it into an exercise in to
 
 **Enough.**
 
-I built `cassette` out of pure spite because I wanted a Spotify client that didn't suck.
+I built `cassette` out of pure spite because I wanted a music player that didn't suck.
 
 The idea is stupidly simple:
 
@@ -91,7 +91,7 @@ The reels move. The tape transfers between the supply and take-up spools. The me
 
 And, crucially, **it actually plays the music.**
 
-`cassette` connects directly to Spotify and bundles its own `librespot` engine, so your computer can show up natively as a Spotify Connect device without needing the official Spotify desktop app or some ridiculous pile of external audio daemons.
+`cassette` connects to **YouTube Music** by default (free, no account needed) using `mpv` + `yt-dlp`, or optionally to **Spotify** via `librespot`. Zero API keys for YouTube Music. Zero Premium account needed.
 
 Search for a track, press play, and you're listening.
 
@@ -105,20 +105,32 @@ No "please configure this external service before sound will come out of your sp
 
 No dead-ass terminal UI pretending that functionality is enough.
 
-Just Spotify, your keyboard, and a fucking cassette tape spinning in your terminal.
+Just your music, your keyboard, and a fucking cassette tape spinning in your terminal.
 
 ---
 
 ## Features
 
+* **YouTube Music First**
+  Free streaming with zero credentials or API keys. Studio version preference (Audio Track Videos) ensures you hear the official studio master, not a music video rip with extra sound effects.
+
+* **Dual-Source Engine**
+  Toggle between YouTube Music (free) and Spotify (Premium) anytime. Both backends are fully supported.
+
 * **Animated ANSI Cassette Art**
   Handcrafted, pixel-aligned cassette animation with realistic rotating 6-tooth gear sprockets, calibrated tape window, dynamic supply/take-up spools, real-time tape transfer, and an integrated metadata HUD.
 
+* **Word-Synced Karaoke Lyrics**
+  Multi-source word-by-word lyrics highlighting from Apple Music (TTML), QQ Music, and LRCLIB. Per-word timing when available, line-synced fallback otherwise.
+
 * **Actually Plays Music**
-  Bundled native `librespot` Spotify Connect support. Your computer appears directly as `cassette` in Spotify. No official Spotify desktop client required. No external audio daemon circus.
+  YouTube Music via `mpv` + `yt-dlp`, or Spotify via bundled `librespot` Connect. Your computer appears directly as `cassette` in Spotify. No external audio daemon circus.
 
 * **Endless Song Radio**
-  Start playing any track from search and `cassette` automatically seeds Spotify's similar-track recommendations, continuously building the queue so you can just let the fucking music run.
+  Start playing any track from search and `cassette` automatically seeds similar-track recommendations, continuously building the queue so you can just let the fucking music run.
+
+* **Zero-CPU Background Mode**
+  When the terminal loses focus or is minimized, cassette stops all ANSI animation rendering and album art rasterization. CPU drops to ~0%. Resumes instantly on re-focus.
 
 * **Distraction-Free Keyboard Controls**
   Search, browse playlists, tracks and albums, switch devices, control volume, seek, shuffle, and manage playback without touching a mouse.
@@ -126,27 +138,20 @@ Just Spotify, your keyboard, and a fucking cassette tape spinning in your termin
 * **Zero Electron Bloat**
   Written in pure Go with Bubble Tea and Lipgloss. Fast startup, low CPU usage, minimal memory footprint, and none of the bullshit that comes with shipping an entire browser just to play a song.
 
-* **Built Because We Wanted It**
-  Not because there was a gap in some corporate market analysis. Not because Spotify asked for another client. Because we wanted to listen to music in a terminal without hating the experience.
-
----
-
-## Features
-
-- **Animated ANSI Cassette Art**: Realistic rotating 6-tooth gear sprockets, calibrated tape window, dynamic supply/take-up spools that transfer tape in real time, and HUD metadata.
-- **Standalone Terminal Audio**: Bundled with native `librespot` Spotify Connect support. No official Spotify desktop client needed. Your PC shows up natively as `cassette`.
-- **Endless Song Radio**: Playing any track from search automatically seeds Spotify's similar-track recommendation engine, queueing endless continuous playback so the music never stops.
-- **Distraction-Free Keybindings**: Full keyboard controls for search, playlists, tracks, albums, devices, volume, seeking, and shuffle.
-- **Zero Electron Bloat**: Pure Go + Bubble Tea + Lipgloss. Fast startup, minimal CPU usage, and low memory footprint.
-
 ---
 
 ## Requirements
 
-- **Spotify Premium** account (not something i can fix srry).
-- **Linux** (PulseAudio / PipeWire, go figure).
-- **librespot** (i wish i didnt have to use this).
-- Standard terminal with UTF-8 support (Kitty, Konsole, Alacritty, WezTerm, iTerm2, etc.).
+### YouTube Music Mode (Default — Free)
+- **Linux** (PulseAudio / PipeWire).
+- **mpv** (audio playback engine).
+- **yt-dlp** (YouTube audio extraction).
+- Standard terminal with UTF-8 support (Kitty, Konsole, Alacritty, WezTerm, etc.).
+
+### Spotify Mode (Optional)
+- **Spotify Premium** account.
+- **librespot** (Spotify Connect audio daemon).
+- A free Spotify Client ID (see setup below).
 
 ---
 
@@ -168,58 +173,51 @@ This compiles the binary and installs it directly to `~/.local/bin/cassette`.
 
 ---
 
-## Setup (5 Minutes)
+## Setup
 
-Spotify requires a free Client ID to talk to their API with PKCE authorization.
-
-### 1. Get a Free Spotify Client ID
-1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
-2. Log in and click **Create App**.
-3. Fill in:
-   - **App name**: `cassette`
-   - **App description**: `Terminal cassette player`
-   - **Redirect URI**: `http://127.0.0.1:8080/callback` (and `http://127.0.0.1:5588/login` for librespot)
-   - Check **Web API** and accept terms.
-4. Open the app settings and copy your **Client ID**.
-
-### 2. Configure Cassette
-Create `~/.config/cassette/config.yml`:
-
-```yaml
-auth:
-  client_id: <YOUR_SPOTIFY_CLIENT_ID>
-```
-
-*(Replace `<YOUR_SPOTIFY_CLIENT_ID>` with your actual client ID)*.
-
-### 3. Audio & Terminal Setup (Minimal vs Full)
-To authorize your terminal as a local audio speaker and configure terminal album art:
+Run the setup assistant:
 
 ```bash
 cassette setup
 ```
 
-When you run `cassette setup`, it will prompt you to choose between profiles and options:
+You'll be prompted to choose a profile:
 
-* **[1] Minimal Setup (Default / Recommended)**
+* **[1] YouTube Music (Default — Recommended)**
+  - Free streaming, no account or API key needed.
+  - Installs `mpv` and `yt-dlp` for audio playback and YouTube audio extraction.
+  - Studio version preference: plays Audio Track Videos (studio masters) over music videos.
+  - Direct flag: `cassette setup --ytmusic`
+
+* **[2] Spotify (Spotify Connect & Web API)**
+  - Requires a [free Spotify Client ID](https://developer.spotify.com/dashboard) + Spotify Premium.
   - Configures `librespot` for native terminal Spotify Connect playback.
-  - Uses the built-in 24-bit Truecolor ANSI Half-Block Album Art (`▀`) engine.
-  - Zero extra dependencies required — works out of the box in Konsole, Alacritty, Kitty, WezTerm, and any 24-bit color terminal.
-  - Direct flag: `cassette setup --minimal`
+  - Direct flag: `cassette setup --spotify`
 
-* **[2] Full Setup**
-  - Everything in Minimal (terminal audio + built-in album art).
-  - Also installs `chafa` (Char Fast Art) for advanced terminal graphics sub-block dithering and multi-protocol scaling.
-  - Direct flag: `cassette setup --full`
+* **[3] Dual Setup (Both YouTube Music & Spotify)**
+  - Installs both backends. Toggle between sources with `F3` in the player.
+  - Direct flag: `cassette setup --dual`
 
-* **[3] [✔] Auto-start Cassette on boot (Checkmark Option)**
-  - Automatically launches Cassette in your terminal when you log into your desktop.
-  - Generates standard FreeDesktop `~/.config/autostart/cassette.desktop` (purely local, zero network telemetry).
-  - Press `3` to toggle the checkmark before choosing profile `1` or `2`.
-  - Direct flags: `cassette setup --autostart` or `cassette setup --no-autostart`.
-  - Can also be toggled anytime in `F2` Settings under `SYSTEM INTEGRATION`.
+* **[4] [✔] Auto-start Cassette on boot**
+  - Launches Cassette automatically in your terminal on desktop login.
+  - Generates standard FreeDesktop `~/.config/autostart/cassette.desktop`.
+  - Toggle flags: `cassette setup --autostart` or `cassette setup --no-autostart`.
 
-A browser window will pop up asking you to approve Spotify Connect. Once approved, `cassette` will permanently register as your PC's playback device.
+### Spotify-Specific Setup
+
+If you chose Spotify mode, you'll also need:
+
+1. Go to the [Spotify Developer Dashboard](https://developer.spotify.com/dashboard).
+2. Create an app with redirect URI `http://127.0.0.1:8080/callback`.
+3. Copy your Client ID to `~/.config/cassette/config.yml`:
+
+```yaml
+default_source: spotify
+auth:
+  client_id: <YOUR_SPOTIFY_CLIENT_ID>
+```
+
+A browser window will pop up during setup to authorize Spotify Connect.
 
 ---
 
@@ -300,7 +298,7 @@ All settings are automatically saved and persistent across sessions.
 
 ## Keywords
 
-`spotify` • `tui` • `terminal` • `cassette` • `retro` • `ansi-art` • `ascii-art` • `librespot` • `music-player` • `cli` • `bubbletea` • `lipgloss` • `golang` • `linux`
+`youtube-music` • `spotify` • `tui` • `terminal` • `cassette` • `retro` • `ansi-art` • `ascii-art` • `librespot` • `mpv` • `yt-dlp` • `music-player` • `cli` • `bubbletea` • `lipgloss` • `golang` • `linux` • `karaoke-lyrics`
 
 ---
 
@@ -363,6 +361,12 @@ u1z9k30yyvy63f5w0jypt02kvvw6dcpcgprlhzmsgc57mw6qc8rtuc5tfd9ny4atqhr448udexhkuc8x
 > **Why no GitHub Sponsors button?** Sponsors doesn't pay out in Pakistan, and most conventional payment processors won't either. There's genuinely no button missing by accident — crypto is just what works.
 
 Anything is appreciated, nothing is expected. If you'd rather help without spending money, a star, a bug report, or a pull request is just as welcome.
+
+---
+
+## Credits
+
+* Forked and evolved from [lazyspotify](https://github.com/ccharles13/lazyspotify) by Charles C.
 
 ---
 

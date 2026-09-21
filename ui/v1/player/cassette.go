@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 
 	"cassette/core/theme"
+	"cassette/core/utils"
 )
 
 const (
@@ -86,8 +87,13 @@ func (c *cassette) View() string {
 	artist := strings.TrimSpace(c.playerStatus.ArtistName)
 
 	if track == "" && !c.playerStatus.Online {
-		track = "CASSETTE TAPE • SPOTIFY REMOTE"
-		artist = "WAITING FOR SPOTIFY PLAYBACK"
+		if utils.IsYouTubeMusicMode() {
+			track = "CASSETTE TAPE • YOUTUBE MUSIC"
+			artist = "PRESS / TO SEARCH OR SPACE TO PLAY"
+		} else {
+			track = "CASSETTE TAPE • SPOTIFY REMOTE"
+			artist = "WAITING FOR SPOTIFY PLAYBACK"
+		}
 	} else if track == "" {
 		track = "CASSETTE TAPE • READY TO PLAY"
 		artist = "PRESS SPACE OR SEARCH (/) TO START"
@@ -141,8 +147,12 @@ func (c *cassette) View() string {
 	// Line 1: Top screws and upper cassette header (width 74)
 	l1 := cGray.Render("│ ") + cCyan.Render("(o)") + cGray.Render("  ") + cCyan.Render("╭───╮") + strings.Repeat(" ", W-17) + cCyan.Render("(o)") + cGray.Render(" │")
 
-	// Line 2: Side B indicator and top rule (width 74)
-	l2 := cGray.Render("│      ") + cCyan.Render("│ B │") + cGray.Render("  "+strings.Repeat("─", W-32)+"  ") + cCyan.Render("[ ]IN [ ]OUT") + cGray.Render("   │")
+	// Line 2: Side B indicator, top rule, and source badge (width 74)
+	sourceBadge := "[YT MUSIC]  "
+	if !utils.IsYouTubeMusicMode() {
+		sourceBadge = "[SPOTIFY]   "
+	}
+	l2 := cGray.Render("│      ") + cCyan.Render("│ B │") + cGray.Render("  "+strings.Repeat("─", W-32)+"  ") + cCyan.Render(sourceBadge) + cGray.Render("   │")
 
 	// Line 3: Side B box bottom (width 74)
 	l3 := cGray.Render("│      ") + cCyan.Render("╰───╯") + strings.Repeat(" ", W-13) + cGray.Render("│")

@@ -59,7 +59,49 @@ func FindCassetteBinary() (string, error) {
 	return "cassette", nil
 }
 
-// EnableAutostart generates ~/.config/autostart/cassette.desktop with Terminal=true
+// detectTerminalEmulator finds an installed terminal emulator for autostart.
+// Returns the terminal command and its argument flag for running a child process.
+func detectTerminalEmulator() (termBin string, execFlag string) {
+	// Check $TERMINAL environment variable first
+	if envTerm := os.Getenv("TERMINAL"); envTerm != "" {
+		if p, err := exec.LookPath(envTerm); err == nil {
+			return p, "-e"
+		}
+	}
+
+	// Ordered preference list of terminal emulators
+	terminals := []struct {
+		name     string
+		execFlag string
+	}{
+		{"konsole", "-e"},
+		{"kitty", "-e"},
+		{"alacritty", "-e"},
+		{"wezterm", "start --"},
+		{"foot", ""},
+		{"gnome-terminal", "--"},
+		{"xfce4-terminal", "-e"},
+		{"xterm", "-e"},
+	}
+
+	for _, t := range terminals {
+		if p, err := exec.LookPath(t.name); err == nil {
+			return p, t.execFlag
+		}
+	}
+
+	return "", ""
+}
+
+// EnableAutostart generates ~/.config/autostart/cassette.desktop that explicitly
+// launches a terminal emulator running Cassette.
+//
+// Bug fix: Previously the .desktop file used Terminal=true, which causes desktop
+// environments (KDE Plasma, GNOME) to run the process silently in the background
+// without allocating a TTY. Bubble Tea then exits or hangs because it has no terminal.
+//
+// The fix detects the installed terminal emulator and writes an Exec= line that
+// explicitly spawns the terminal with Cassette as its child process, with Terminal=false.
 func EnableAutostart(customBinPath ...string) error {
 	p, err := GetAutostartFilePath()
 	if err != nil {
@@ -76,20 +118,42 @@ func EnableAutostart(customBinPath ...string) error {
 		bin, _ = FindCassetteBinary()
 	}
 
+	// Build the Exec line with an explicit terminal emulator wrapper
+	execLine := buildTerminalExecLine(bin)
+
 	desktopEntry := fmt.Sprintf(`[Desktop Entry]
 Type=Application
 Name=Cassette
-GenericName=Spotify Music Player
-Comment=Spotify Terminal Deck & Audio Player
+GenericName=Cassette Music Player
+Comment=Cassette Retro Terminal Deck & Audio Player
 Exec=%s
 Icon=multimedia-audio-player
-Terminal=true
+Terminal=false
 Categories=Audio;Music;Player;ConsoleOnly;
 StartupNotify=false
 X-GNOME-Autostart-enabled=true
-`, bin)
+`, execLine)
 
 	return os.WriteFile(p, []byte(desktopEntry), 0644)
+}
+
+// buildTerminalExecLine creates a shell wrapper that detects the terminal at runtime.
+// If we can detect the terminal now, we use it directly. Otherwise we use a shell
+// one-liner that probes multiple terminals at boot.
+func buildTerminalExecLine(cassetteBin string) string {
+	termBin, execFlag := detectTerminalEmulator()
+
+	if termBin != "" {
+		// Direct launch with detected terminal
+		if execFlag != "" {
+			return fmt.Sprintf("%s %s %s", termBin, execFlag, cassetteBin)
+		}
+		// foot uses positional args, no flag
+		return fmt.Sprintf("%s %s", termBin, cassetteBin)
+	}
+
+	// Fallback: shell one-liner that probes terminals at boot time
+	return fmt.Sprintf(`sh -c 'if command -v konsole >/dev/null 2>&1; then exec konsole -e "$0"; elif command -v kitty >/dev/null 2>&1; then exec kitty -e "$0"; elif command -v alacritty >/dev/null 2>&1; then exec alacritty -e "$0"; elif command -v foot >/dev/null 2>&1; then exec foot "$0"; elif command -v gnome-terminal >/dev/null 2>&1; then exec gnome-terminal -- "$0"; else exec xterm -e "$0"; fi' %s`, cassetteBin)
 }
 
 // DisableAutostart removes ~/.config/autostart/cassette.desktop if present.

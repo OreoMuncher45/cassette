@@ -5,16 +5,19 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/help"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"cassette/core/artwork"
 	"cassette/core/auth"
 	"cassette/core/logger"
 	corelyrics "cassette/core/lyrics"
 	"cassette/core/mpris"
 	coreplayer "cassette/core/player"
+	"cassette/core/theme"
 	"cassette/core/ticker"
 	"cassette/core/utils"
 	"cassette/spotify"
@@ -36,6 +39,7 @@ type Model struct {
 	settingsModel      settings.Model
 	playing            bool
 	playerReady        bool
+	isFocused          bool
 	songInfo           common.SongInfo
 	volumeInfo         common.VolumeInfo
 	volumeOverlayUntil time.Time
@@ -57,6 +61,7 @@ type Model struct {
 	help               help.Model
 	keys               *common.AppKeyMap
 	requestHandlers    map[common.MediaRequestKind]func(common.MediaRequest) tea.Cmd
+	welcomeModel       *WelcomeModel
 }
 
 type nextTrackOkMsg struct{}
@@ -144,6 +149,7 @@ func NewModel() *Model {
 		help:          newHelpModel(),
 		keys:          keys,
 		volumeInfo:    common.VolumeInfo{Volume: 50, Max: 100},
+		isFocused:     true,
 	}
 	model.requestHandlers = map[common.MediaRequestKind]func(common.MediaRequest) tea.Cmd{
 		common.GetUserPlaylists:   model.handleGetUserPlaylists,
@@ -829,3 +835,138 @@ func (m *Model) initMpris() {
 	m.updateMprisState()
 }
 
+// --- Welcome Popup (one-time changelog + crypto donation) ---
+
+const welcomeVersion = "2.0.0"
+
+// WelcomeModel is a one-time modal popup showing the changelog and donation info.
+type WelcomeModel struct {
+	open bool
+}
+
+func (w *WelcomeModel) IsOpen() bool {
+	return w != nil && w.open
+}
+
+func (w *WelcomeModel) Close() {
+	if w != nil {
+		w.open = false
+	}
+}
+
+func (w *WelcomeModel) View() string {
+	if w == nil || !w.open {
+		return ""
+	}
+	th := theme.Get()
+	accent := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true)
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("245"))
+	bright := lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
+	border := lipgloss.NewStyle().Foreground(th.BorderColor())
+
+	w_ := 76
+	hr := border.Render(strings.Repeat("─", w_-4))
+
+	lines := []string{
+		border.Render("╭" + strings.Repeat("─", w_-2) + "╮"),
+		border.Render("│") + accent.Render(centerPad(" CASSETTE OVERHAUL — WHAT'S NEW ", w_-2)) + border.Render("│"),
+		border.Render("│") + strings.Repeat(" ", w_-2) + border.Render("│"),
+		border.Render("│") + bright.Render(padRight("  🎵 YouTube Music First", w_-2)) + border.Render("│"),
+		border.Render("│") + dim.Render(padRight("     Free streaming, no Spotify Premium required.", w_-2)) + border.Render("│"),
+		border.Render("│") + bright.Render(padRight("  🎙️ Word-Synced Karaoke Lyrics", w_-2)) + border.Render("│"),
+		border.Render("│") + dim.Render(padRight("     Multi-source word-by-word highlighting (LRCLIB, Portato, etc).", w_-2)) + border.Render("│"),
+		border.Render("│") + bright.Render(padRight("  ⚡ Zero-CPU Background", w_-2)) + border.Render("│"),
+		border.Render("│") + dim.Render(padRight("     Animations & artwork rasterization pause when terminal is idle/unfocused.", w_-2)) + border.Render("│"),
+		border.Render("│") + bright.Render(padRight("  🚀 Fixed Boot Autostart", w_-2)) + border.Render("│"),
+		border.Render("│") + dim.Render(padRight("     Reliable startup wrapper in KDE Plasma / GNOME / Wayland.", w_-2)) + border.Render("│"),
+		border.Render("│") + bright.Render(padRight("  🔀 Dual-Source Engine", w_-2)) + border.Render("│"),
+		border.Render("│") + dim.Render(padRight("     YouTube Music default + Spotify mode retained for exclusive tracks.", w_-2)) + border.Render("│"),
+		border.Render("│") + strings.Repeat(" ", w_-2) + border.Render("│"),
+		border.Render("│  ") + hr + border.Render("  │"),
+		border.Render("│") + strings.Repeat(" ", w_-2) + border.Render("│"),
+		border.Render("│") + accent.Render(padRight("  Cassette is 100% free & open source.", w_-2)) + border.Render("│"),
+		border.Render("│") + dim.Render(padRight("  No telemetry, ads, or pro tiers. Ever.", w_-2)) + border.Render("│"),
+		border.Render("│") + strings.Repeat(" ", w_-2) + border.Render("│"),
+		border.Render("│") + bright.Render(padRight("  Support development via crypto donations:", w_-2)) + border.Render("│"),
+		border.Render("│") + dim.Render(padRight("  • Nano (XNO):", w_-2)) + border.Render("│"),
+		border.Render("│") + bright.Render(padRight("    nano_1zqdw3qf1z8k3jx8jintaiwpo3yz7zqh1me4ph5j439ts8hsppx8dzy4xcsz", w_-2)) + border.Render("│"),
+		border.Render("│") + dim.Render(padRight("  • USDC (Base):", w_-2)) + border.Render("│"),
+		border.Render("│") + bright.Render(padRight("    0x3f262ee685ced4a8270cece45ebdfdb2b18f54b5", w_-2)) + border.Render("│"),
+		border.Render("│") + dim.Render(padRight("  • Zcash (ZEC):", w_-2)) + border.Render("│"),
+		border.Render("│") + bright.Render(padRight("    u1z9k30yyvy63f5w0jypt02kvvw6dcpcgprlhzmsgc57mw6qc8rtuc5tfd9ny4at", w_-2)) + border.Render("│"),
+		border.Render("│") + bright.Render(padRight("    qhr448udexhkuc8xgl0z5rd9njuxnwl7kh2ahqwcqlydt9dpr4t40eawr5st74as", w_-2)) + border.Render("│"),
+		border.Render("│") + bright.Render(padRight("    5jed669993epsnwuejnrwv4yrkx065pqvmt0cr8gdwggcv2djp", w_-2)) + border.Render("│"),
+		border.Render("│") + strings.Repeat(" ", w_-2) + border.Render("│"),
+		border.Render("│") + accent.Render(centerPad(" [Press Enter / Esc / Space to dismiss] ", w_-2)) + border.Render("│"),
+		border.Render("╰" + strings.Repeat("─", w_-2) + "╯"),
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+func centerPad(s string, w int) string {
+	visW := len([]rune(s))
+	if visW >= w {
+		return s
+	}
+	left := (w - visW) / 2
+	right := w - visW - left
+	return strings.Repeat(" ", left) + s + strings.Repeat(" ", right)
+}
+
+func padRight(s string, w int) string {
+	visW := len([]rune(s))
+	if visW >= w {
+		return s
+	}
+	return s + strings.Repeat(" ", w-visW)
+}
+
+func (m *Model) initWelcomePopup() {
+	cfg := utils.GetConfig()
+	if cfg.SeenWelcomeVersion >= welcomeVersion {
+		return
+	}
+	m.welcomeModel = &WelcomeModel{open: true}
+}
+
+func (m *Model) dismissWelcome() {
+	if m.welcomeModel != nil {
+		m.welcomeModel.Close()
+	}
+	go func() {
+		_ = utils.SetSeenWelcomeVersion(welcomeVersion)
+	}()
+}
+
+// backgroundPlaceholderView renders a minimal view when the terminal is unfocused,
+// avoiding all expensive ANSI art, album art, and animation rendering.
+func (m *Model) backgroundPlaceholderView() string {
+	th := theme.Get()
+	accent := lipgloss.NewStyle().Foreground(th.PrimaryColor()).Bold(true)
+	dim := lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+
+	status := "paused"
+	if m.playing {
+		status = "playing"
+	}
+
+	info := ""
+	if m.songInfo.Title != "" {
+		info = fmt.Sprintf("%s — %s", m.songInfo.Title, m.songInfo.Artist)
+	}
+
+	line1 := accent.Render("♪ cassette") + dim.Render(" • [background] • CPU 0%")
+	line2 := dim.Render(fmt.Sprintf("  %s", status))
+	line3 := ""
+	if info != "" {
+		line3 = dim.Render("  " + info)
+	}
+
+	content := lipgloss.JoinVertical(lipgloss.Center, line1, line2, line3)
+	return lipgloss.NewStyle().
+		Width(m.width).
+		Height(m.height).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render(content)
+}
