@@ -144,7 +144,14 @@ func setupPCHandler(args []string) bool {
 			setupChafa()
 		}
 		spotifyOk := setupSpotify()
-		success = spotifyOk && success
+		if !spotifyOk && (mode == "spotify" || mode == "spotify-full") {
+			fmt.Println("\nNotice: Spotify setup skipped. Switching default playback source to YouTube Music (free, no login required).")
+			mode = "ytmusic"
+			setupYouTubeMusic()
+			success = true
+		} else {
+			success = spotifyOk && success
+		}
 	}
 
 	// --- Write default_source to config ---
@@ -284,6 +291,7 @@ func setupSpotify() bool {
 	}
 
 	fmt.Println("\nWaiting for Spotify authorization...")
+	fmt.Println("▶ Press [Enter] or [s] in this terminal to SKIP Spotify and use YouTube Music instead.")
 	lineCh := make(chan string, 100)
 	var wg sync.WaitGroup
 	wg.Add(2)
@@ -302,6 +310,19 @@ func setupSpotify() bool {
 	go func() {
 		wg.Wait()
 		close(lineCh)
+	}()
+
+	skipCh := make(chan struct{}, 1)
+	go func() {
+		reader := bufio.NewReader(os.Stdin)
+		line, _ := reader.ReadString('\n')
+		line = strings.TrimSpace(line)
+		if line == "" || strings.EqualFold(line, "s") || strings.EqualFold(line, "skip") || strings.EqualFold(line, "y") {
+			select {
+			case skipCh <- struct{}{}:
+			default:
+			}
+		}
 	}()
 
 	openedBrowser := false
@@ -330,6 +351,13 @@ func setupSpotify() bool {
 
 	for {
 		select {
+		case <-skipCh:
+			fmt.Println("\nSkipping Spotify setup — falling back to YouTube Music (free, no login required).")
+			if cmd.Process != nil {
+				_ = cmd.Process.Kill()
+				_ = cmd.Wait()
+			}
+			return false
 		case <-credFoundCh:
 			authenticated = true
 		case line, ok := <-lineCh:

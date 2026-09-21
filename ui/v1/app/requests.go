@@ -2,15 +2,28 @@ package app
 
 import (
 	"context"
+	"fmt"
 	"strings"
 
 	tea "charm.land/bubbletea/v2"
 	"cassette/core/logger"
+	"cassette/core/utils"
+	"cassette/core/ytmusic"
 	"cassette/ui/v1/common"
 	"github.com/zmb3/spotify/v2"
 )
 
 func (m *Model) handleGetUserPlaylists(request common.MediaRequest) tea.Cmd {
+	if utils.IsYouTubeMusicMode() {
+		return func() tea.Msg {
+			entities := []common.Entity{
+				common.NewEntity("🔍 Search YouTube Music", "Press / to search songs, albums & artists", "ytmusic:search", ""),
+				common.NewEntity("⚡ Free Audio Streaming", "No login, credentials, or Spotify Premium needed", "ytmusic:info", ""),
+			}
+			pagination := paginationFromOffset(0, len(entities), len(entities), 10)
+			return mediaLoadedMsg{entities: entities, kind: common.Playlists, pagination: pagination, request: request}
+		}
+	}
 	if m.spotifyClient == nil {
 		return nil
 	}
@@ -91,6 +104,25 @@ func (m *Model) handleSearchPlaylists(request common.MediaRequest) tea.Cmd {
 }
 
 func (m *Model) handleSearchTracks(request common.MediaRequest) tea.Cmd {
+	if utils.IsYouTubeMusicMode() {
+		return func() tea.Msg {
+			results, err := ytmusic.GetClient().Search(context.Background(), request.Query, 20)
+			if err != nil {
+				return mediaLoadErrMsg{err: err, request: request}
+			}
+			var entities []common.Entity
+			for _, t := range results.Tracks {
+				desc := t.Artist
+				if t.Album != "" {
+					desc += " • " + t.Album
+				}
+				id := fmt.Sprintf("ytmusic:%s|%s|%s|%s", t.VideoID, t.Title, t.Artist, t.ArtURL)
+				entities = append(entities, common.NewEntity(t.Title, desc, id, t.ArtURL))
+			}
+			pagination := paginationFromOffset(0, len(entities), len(entities), 20)
+			return mediaLoadedMsg{entities: entities, kind: common.Tracks, pagination: pagination, request: request}
+		}
+	}
 	if m.spotifyClient == nil {
 		return nil
 	}
@@ -192,6 +224,58 @@ func (m *Model) handleGetAlbumTracks(request common.MediaRequest) tea.Cmd {
 }
 
 func (m *Model) handlePlayTrackRequest(request common.MediaRequest) tea.Cmd {
+	if utils.IsYouTubeMusicMode() || strings.HasPrefix(request.EntityURI, "ytmusic:") {
+		m.mediaCenter.SetDisplay("Streaming from YouTube Music...")
+		m.mediaCenter.CloseLibrary()
+		return func() tea.Msg {
+			raw := strings.TrimPrefix(request.EntityURI, "ytmusic:")
+			parts := strings.Split(raw, "|")
+			videoID := parts[0]
+			title := "YouTube Track"
+			artist := "YouTube Music"
+			artURL := ""
+			if len(parts) > 1 && parts[1] != "" {
+				title = parts[1]
+			}
+			if len(parts) > 2 && parts[2] != "" {
+				artist = parts[2]
+			}
+			if len(parts) > 3 && parts[3] != "" {
+				artURL = parts[3]
+			}
+
+			streamURL := ytmusic.GetClient().GetStreamURL(videoID)
+			if m.mpvPlayer != nil {
+				if err := m.mpvPlayer.Play(streamURL); err != nil {
+					return playTrackErrMsg{err: err, panelKind: request.PanelKind}
+				}
+			}
+			m.playing = true
+			m.playerReady = true
+			m.songInfo = common.SongInfo{
+				Title:    title,
+				Artist:   artist,
+				Position: 0,
+			}
+			m.mediaCenter.SetDisplayFromSong(m.songInfo)
+			m.updatePlayerStatus()
+			if artURL != "" {
+				artCols, artRows := m.desiredArtworkDimensions()
+				m.lastArtworkURL = artURL
+				if m.program != nil {
+					go func() {
+						m.program.Send(m.fetchArtworkCmd(artURL, artCols, artRows)())
+					}()
+				}
+			}
+			if m.program != nil {
+				go func() {
+					m.program.Send(m.fetchLyricsCmd(title, artist)())
+				}()
+			}
+			return playTrackOkMsg{panelKind: request.PanelKind}
+		}
+	}
 	if m.player == nil {
 		return m.mediaCenter.SetStatus(request.PanelKind, "Player not ready")
 	}

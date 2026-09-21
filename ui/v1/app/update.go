@@ -35,6 +35,15 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.authModel != nil && m.authModel.State() < uiauth.Authenticated {
+		if keyMsg, ok := msg.(tea.KeyPressMsg); ok {
+			switch keyMsg.String() {
+			case "s", "S", "y", "Y", "esc", "escape":
+				m.switchToYouTubeMusic()
+				return m, nil
+			case "q", "ctrl+c":
+				return m, tea.Quit
+			}
+		}
 		newModel, cmd := m.authModel.Update(msg)
 		m.authModel = newModel.(*uiauth.Model)
 		return m, cmd

@@ -45,6 +45,7 @@ type Model struct {
 	volumeOverlayUntil time.Time
 	fatalErr           error
 	player             *coreplayer.Player
+	mpvPlayer          *coreplayer.MpvPlayer
 	localDaemon        *coreplayer.LocalDaemon
 	spotifyClient      *spotify.SpotifyClient
 	mediaCenter        mediacenter.Model
@@ -218,6 +219,36 @@ func (m *Model) shutdown() {
 	if m.localDaemon != nil {
 		m.localDaemon.Stop()
 	}
+	if m.mpvPlayer != nil {
+		m.mpvPlayer.Shutdown()
+	}
+}
+
+func (m *Model) initYouTubeMusic() {
+	if m.authModel != nil {
+		m.authModel.SetState(uiauth.Authenticated)
+	}
+	if m.mpvPlayer == nil {
+		mpv, err := coreplayer.NewMpvPlayer()
+		if err != nil {
+			logger.Log.Warn().Err(err).Msg("failed to start mpv player daemon")
+		} else {
+			m.mpvPlayer = mpv
+			m.volumeInfo = common.VolumeInfo{Volume: mpv.GetVolume(), Max: 100}
+		}
+	}
+	m.playerReady = true
+	m.initMpris()
+	m.initWelcomePopup()
+}
+
+func (m *Model) switchToYouTubeMusic() {
+	cfg := utils.GetConfig()
+	cfg.DefaultSource = "ytmusic"
+	_ = utils.SaveConfig(cfg)
+	m.initYouTubeMusic()
+	m.mediaCenter.SetDisplay("YouTube Music (Press / to search)")
+	m.updatePlayerStatus()
 }
 
 func (m *Model) start() error {
@@ -227,6 +258,12 @@ func (m *Model) start() error {
 	if m.width != 0 || m.height != 0 {
 		m.authModel.SetSize(m.width, m.height)
 		m.devicesModel.SetSize(m.width, m.height)
+	}
+
+	// YouTube Music mode requires ZERO credentials — skip Spotify auth completely
+	if utils.IsYouTubeMusicMode() {
+		m.initYouTubeMusic()
+		return nil
 	}
 
 	m.spotifyClient, err = spotify.NewSpotifyClient(ctx, m.authModel.Authenticator())
@@ -295,6 +332,21 @@ func (m *Model) fetchDevicesCmd() tea.Cmd {
 
 func (m *Model) pollPlayerStateCmd() tea.Cmd {
 	return func() tea.Msg {
+		if utils.IsYouTubeMusicMode() {
+			if m.mpvPlayer != nil {
+				pos := m.mpvPlayer.PositionMs()
+				dur := m.mpvPlayer.DurationMs()
+				playing := m.mpvPlayer.IsPlaying()
+				m.playing = playing
+				m.songInfo.Position = pos
+				if dur > 0 {
+					m.songInfo.Duration = dur
+				}
+				m.mediaCenter.SetLyricsPosition(pos)
+				m.updatePlayerStatus()
+			}
+			return nil
+		}
 		if m.player == nil {
 			return playerStateMsg{state: nil, err: fmt.Errorf("player not initialized")}
 		}
@@ -446,6 +498,20 @@ func (m *Model) updatePlayerStatus() {
 }
 
 func (m *Model) playPause() error {
+	if utils.IsYouTubeMusicMode() && m.mpvPlayer != nil {
+		if m.playing {
+			err := m.mpvPlayer.Pause()
+			if err == nil {
+				m.playing = false
+			}
+			return err
+		}
+		err := m.mpvPlayer.Resume()
+		if err == nil {
+			m.playing = true
+		}
+		return err
+	}
 	if m.player == nil {
 		return fmt.Errorf("player not ready")
 	}
@@ -453,23 +519,29 @@ func (m *Model) playPause() error {
 }
 
 func (m *Model) seekForward() error {
-	if m.player == nil {
-		return fmt.Errorf("player not ready")
-	}
 	step := utils.GetConfig().Player.SeekStepMs
 	if step <= 0 {
 		step = 5000
+	}
+	if utils.IsYouTubeMusicMode() && m.mpvPlayer != nil {
+		return m.mpvPlayer.SeekRelative(step)
+	}
+	if m.player == nil {
+		return fmt.Errorf("player not ready")
 	}
 	return m.player.Seek(context.Background(), step, true, m.songInfo.Position)
 }
 
 func (m *Model) seekBackward() error {
-	if m.player == nil {
-		return fmt.Errorf("player not ready")
-	}
 	step := utils.GetConfig().Player.SeekStepMs
 	if step <= 0 {
 		step = 5000
+	}
+	if utils.IsYouTubeMusicMode() && m.mpvPlayer != nil {
+		return m.mpvPlayer.SeekRelative(-step)
+	}
+	if m.player == nil {
+		return fmt.Errorf("player not ready")
 	}
 	return m.player.Seek(context.Background(), -step, true, m.songInfo.Position)
 }
@@ -496,6 +568,14 @@ func (m *Model) shuffle(shuffle bool) error {
 }
 
 func (m *Model) changeVolume(deltaPercent int) (common.VolumeInfo, error) {
+	if utils.IsYouTubeMusicMode() && m.mpvPlayer != nil {
+		target := max(0, min(100, m.volumeInfo.Volume+deltaPercent))
+		if err := m.mpvPlayer.SetVolume(target); err != nil {
+			return common.VolumeInfo{}, err
+		}
+		m.volumeInfo = common.VolumeInfo{Volume: target, Max: 100}
+		return m.volumeInfo, nil
+	}
 	if m.player == nil {
 		return common.VolumeInfo{}, fmt.Errorf("player not ready")
 	}
